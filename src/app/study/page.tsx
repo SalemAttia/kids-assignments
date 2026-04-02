@@ -10,7 +10,7 @@ const SUBJECTS = Object.entries(SUBJECT_LABELS) as [Subject, string][]
 
 export default function StudyPage() {
   const router = useRouter()
-  const { userId } = useCurrentUser()
+  const { userId, loaded } = useCurrentUser()
   const { setSessionId } = useStudySession()
 
   const [subject, setSubject] = useState<Subject | null>(null)
@@ -21,8 +21,8 @@ export default function StudyPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!userId) router.replace('/')
-  }, [userId, router])
+    if (loaded && !userId) router.replace('/')
+  }, [loaded, userId, router])
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]

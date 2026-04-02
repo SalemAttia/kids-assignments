@@ -8,7 +8,7 @@ import type { Question } from '@/types'
 
 export default function QuizPage() {
   const router = useRouter()
-  const { userId } = useCurrentUser()
+  const { userId, loaded } = useCurrentUser()
   const { getSessionId, getQuestions, setQuestions, setReportId } = useStudySession()
 
   const [questions, setQuestionsState] = useState<Question[]>([])
@@ -19,6 +19,7 @@ export default function QuizPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (!loaded) return
     if (!userId) { router.replace('/'); return }
     const sessionId = getSessionId()
     if (!sessionId) { router.replace('/study'); return }
@@ -60,7 +61,7 @@ export default function QuizPage() {
     }
 
     generate()
-  }, [userId, router, getSessionId, getQuestions, setQuestions])
+  }, [loaded, userId, router, getSessionId, getQuestions, setQuestions])
 
   function handleAnswer(questionId: string, value: string) {
     setAnswers(prev => ({ ...prev, [questionId]: value }))

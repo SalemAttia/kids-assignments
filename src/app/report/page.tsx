@@ -13,16 +13,17 @@ interface ReportData {
 
 export default function ReportPage() {
   const router = useRouter()
-  const { userId } = useCurrentUser()
+  const { userId, loaded } = useCurrentUser()
   const { clearSession } = useStudySession()
   const [data, setData] = useState<ReportData | null>(null)
 
   useEffect(() => {
+    if (!loaded) return
     if (!userId) { router.replace('/'); return }
     const raw = sessionStorage.getItem('reportData')
     if (!raw) { router.replace('/study'); return }
     setData(JSON.parse(raw))
-  }, [userId, router])
+  }, [loaded, userId, router])
 
   function handleNewSession() {
     clearSession()
