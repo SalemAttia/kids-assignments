@@ -1,0 +1,69 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  grade INT NOT NULL,
+  points INT NOT NULL DEFAULT 0,
+  streak INT NOT NULL DEFAULT 0,
+  last_active DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO users (name, grade) VALUES ('أحمد', 6), ('محمود', 9);
+
+CREATE TABLE study_sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  subject TEXT NOT NULL,
+  description TEXT NOT NULL,
+  image_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_sessions_user_id ON study_sessions(user_id);
+CREATE INDEX idx_sessions_created_at ON study_sessions(created_at DESC);
+
+CREATE TABLE questions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  session_id UUID NOT NULL REFERENCES study_sessions(id) ON DELETE CASCADE,
+  question_text TEXT NOT NULL,
+  question_type TEXT NOT NULL CHECK (question_type IN ('multiple_choice','short_answer')),
+  options JSONB,
+  correct_answer TEXT NOT NULL,
+  order_index INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_questions_session_id ON questions(session_id);
+
+CREATE TABLE answers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  question_id UUID NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+  session_id UUID NOT NULL REFERENCES study_sessions(id) ON DELETE CASCADE,
+  answer_text TEXT NOT NULL,
+  is_correct BOOLEAN,
+  score INT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_answers_session_id ON answers(session_id);
+
+CREATE TABLE reports (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  session_id UUID NOT NULL UNIQUE REFERENCES study_sessions(id) ON DELETE CASCADE,
+  total_score INT NOT NULL,
+  feedback TEXT NOT NULL,
+  mistakes JSONB,
+  suggestions JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE weekly_summaries (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  week_start DATE NOT NULL,
+  week_end DATE NOT NULL,
+  summary TEXT NOT NULL,
+  strengths JSONB,
+  weaknesses JSONB,
+  recommendations JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, week_start)
+);
