@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { userId, subject, description, imageUrl } = SessionSchema.parse(body)
 
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const { data, error } = await supabase
       .from('study_sessions')
       .insert({ user_id: userId, subject, description, image_url: imageUrl ?? null })

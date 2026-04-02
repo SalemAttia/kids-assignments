@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data, error } = await supabase

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { sessionId, subject, description, grade, imageUrl } = RequestSchema.parse(body)
 
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const prompt = buildGenerateQuestionsPrompt(subject as Subject, description, grade)
 
     const messages: Parameters<typeof openai.chat.completions.create>[0]['messages'] = [

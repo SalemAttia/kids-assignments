@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { sessionId, answers } = RequestSchema.parse(body)
 
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     // Fetch session + user
     const { data: session } = await supabase

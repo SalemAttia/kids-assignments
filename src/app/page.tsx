@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import type { User } from '@/types'
 
@@ -14,7 +14,7 @@ export default function HomePage() {
   const router = useRouter()
 
   useEffect(() => {
-    supabase.from('users').select('*').then(({ data }) => {
+    createClient().from('users').select('*').then(({ data }) => {
       if (data) setUsers(data)
       setLoading(false)
     })

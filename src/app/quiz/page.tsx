@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useStudySession } from '@/hooks/useStudySession'
-import { supabase } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import type { Question } from '@/types'
 
 export default function QuizPage() {
@@ -32,7 +32,7 @@ export default function QuizPage() {
 
     // Fetch user grade, then generate questions
     const generate = async () => {
-      const { data: session } = await supabase
+      const { data: session } = await createClient()
         .from('study_sessions')
         .select('subject, description, image_url, users(grade)')
         .eq('id', sessionId)

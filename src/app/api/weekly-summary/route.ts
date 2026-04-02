@@ -12,7 +12,7 @@ const RequestSchema = z.object({ userId: z.string().uuid() })
 export async function POST(req: NextRequest) {
   try {
     const { userId } = RequestSchema.parse(await req.json())
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     const now = new Date()
     const dayOfWeek = now.getDay()

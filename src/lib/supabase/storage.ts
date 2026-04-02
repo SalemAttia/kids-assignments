@@ -1,6 +1,8 @@
-import { supabase } from './client'
+'use client'
+import { createClient } from './client'
 
 export async function uploadStudyImage(file: File, userId: string): Promise<string> {
+  const supabase = createClient()
   const timestamp = Date.now()
   const ext = file.name.split('.').pop()
   const path = `${userId}/${timestamp}.${ext}`

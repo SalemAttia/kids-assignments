@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import { SUBJECT_LABELS } from '@/types'
 import type { User, Subject } from '@/types'
 import {
@@ -53,7 +53,7 @@ export default function ParentDashboard() {
   }, [router])
 
   async function loadData() {
-    const { data: usersData } = await supabase.from('users').select('*')
+    const { data: usersData } = await createClient().from('users').select('*')
     if (!usersData) { setLoading(false); return }
     setUsers(usersData)
 
