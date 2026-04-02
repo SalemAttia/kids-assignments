@@ -14,10 +14,14 @@ export default function HomePage() {
   const router = useRouter()
 
   useEffect(() => {
-    createClient().from('users').select('*').then(({ data }) => {
-      if (data) setUsers(data)
-      setLoading(false)
-    })
+    createClient()
+      .from('users')
+      .select('*')
+      .then(({ data, error }) => {
+        if (error) console.error('Supabase error:', error.message)
+        if (data) setUsers(data)
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   function handleSelect(user: User) {

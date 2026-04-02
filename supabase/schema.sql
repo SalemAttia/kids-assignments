@@ -67,3 +67,17 @@ CREATE TABLE weekly_summaries (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, week_start)
 );
+
+-- Storage: create bucket and open RLS policies (app uses custom auth, not Supabase Auth)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('study-images', 'study-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "public upload study-images" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'study-images');
+
+CREATE POLICY "public read study-images" ON storage.objects
+  FOR SELECT USING (bucket_id = 'study-images');
+
+CREATE POLICY "public delete study-images" ON storage.objects
+  FOR DELETE USING (bucket_id = 'study-images');
