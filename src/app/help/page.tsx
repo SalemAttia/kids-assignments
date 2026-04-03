@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { SUBJECT_LABELS, type Subject } from '@/types'
+import { type Subject } from '@/types'
 import BottomNav from '@/components/BottomNav'
 
 const SUBJECTS: { value: Subject; emoji: string; label: string; color: string }[] = [
@@ -28,7 +28,6 @@ export default function HelpPage() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [imageBase64Array, setImageBase64Array] = useState<string[]>([])
   const [explanation, setExplanation] = useState('')
-  const [quickActions, setQuickActions] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [listening, setListening] = useState(false)
@@ -124,7 +123,6 @@ export default function HelpPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setExplanation(data.explanation)
-      setQuickActions(data.quickActions || [])
     } catch {
       setExplanation('آسف، في مشكلة. حاول تاني!')
     } finally {
@@ -266,22 +264,6 @@ export default function HelpPage() {
 
             {error && <p className="text-red-500 text-sm text-center mb-3">{error}</p>}
 
-            {/* Quick Actions */}
-            <div className="mb-4">
-              <p className="text-xs text-slate-400 mb-2 font-medium">أو اختار سؤال سريع:</p>
-              <div className="flex flex-wrap gap-2">
-                {(QUICK_ACTIONS[subject!] || []).map((action, i) => (
-                  <button
-                    key={i}
-                    onClick={() => { setQuestion(action); askAI(action) }}
-                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 hover:border-blue-300 hover:bg-blue-50 transition-all"
-                  >
-                    {action}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <button
               onClick={() => askAI()}
               disabled={!question.trim() && imageBase64Array.length === 0}
@@ -349,23 +331,6 @@ export default function HelpPage() {
             </div>
 
             {/* Quick follow-up actions */}
-            {!loading && quickActions.length > 0 && (
-              <div className="mb-5">
-                <p className="text-xs text-slate-400 mb-2 font-medium">أسئلة تانية ممكن تسألها:</p>
-                <div className="flex flex-wrap gap-2">
-                  {quickActions.map((action, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { setQuestion(action); askAI(action) }}
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 hover:border-violet-300 hover:bg-violet-50 transition-all"
-                    >
-                      {action}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {!loading && (
               <div className="space-y-3">
                 <button
@@ -392,15 +357,3 @@ export default function HelpPage() {
   )
 }
 
-// Quick actions per subject
-const QUICK_ACTIONS: Record<Subject, string[]> = {
-  arabic:         ['اشرحلي القاعدة بمثال', 'الفرق بين كلمتين', 'أعرب الجملة دي', 'صحح الغلطة الإملائية'],
-  math:           ['احل المسألة دي خطوة خطوة', 'اشرحلي القانون', 'ديني مثال أسهل', 'إيه الفرق بين العمليتين؟'],
-  science:        ['اشرح بمثال من الحياة', 'ليه بيحصل ده؟', 'إيه الفرق بين المفهومين؟', 'لخصلي الدرس'],
-  english:        ['Explain in simple Arabic', 'Give me examples', 'What does this word mean?', 'Fix my sentence'],
-  social_studies: ['فين ده على الخريطة؟', 'ليه حصل ده؟', 'امتى كان ده؟', 'اشرح على شكل قصة'],
-  religion:       ['اشرحلي معنى الآية', 'إيه حكم المسألة دي؟', 'ديني مثال', 'لخصلي الدرس'],
-  computer:       ['اشرح بمثال عملي', 'إيه الفرق بين المصطلحين؟', 'إزاي التقنية دي بتشتغل؟', 'ديني تمرين'],
-  art:            ['اشرحلي التقنية دي', 'إزاي أرسم ده؟', 'إيه الألوان المناسبة؟', 'ديني فكرة مشروع'],
-  other:          ['اشرح بطريقة أبسط', 'ديني مثال', 'لخصلي الفكرة', 'إزاي أحفظ ده؟'],
-}
