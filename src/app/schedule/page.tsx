@@ -147,7 +147,7 @@ export default function SchedulePage() {
           onClick={() => setOpenDay(null)}
         >
           <div
-            className="w-full bg-white rounded-t-3xl p-6 shadow-2xl"
+            className="w-full bg-white rounded-t-3xl p-6 pb-24 shadow-2xl"
             onClick={e => e.stopPropagation()}
             dir="rtl"
           >
