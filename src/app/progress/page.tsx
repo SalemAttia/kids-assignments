@@ -15,6 +15,14 @@ interface Session {
   reports: Array<{ total_score: number }>
 }
 
+interface HelpSession {
+  id: string
+  subject: string
+  question: string
+  explanation: string
+  created_at: string
+}
+
 function formatMinutes(m: number) {
   if (!m || m === 0) return '—'
   if (m < 60) return `${m} د`
@@ -27,12 +35,20 @@ function ScoreBadge({ score }: { score: number }) {
   return <span className={`px-3 py-1 rounded-xl text-sm font-bold ${color}`}>{emoji} {score}%</span>
 }
 
+const SUBJECT_EMOJIS: Record<string, string> = {
+  arabic: '📖', math: '🔢', science: '🔬', english: '💬',
+  social_studies: '🌍', religion: '🌙', computer: '💻', art: '🎨', other: '📚',
+}
+
 export default function ProgressPage() {
   const router = useRouter()
   const { userId, loaded } = useCurrentUser()
   const [sessions, setSessions] = useState<Session[]>([])
+  const [helpSessions, setHelpSessions] = useState<HelpSession[]>([])
   const [loading, setLoading] = useState(true)
   const [userName, setUserName] = useState('')
+  const [tab, setTab] = useState<'sessions' | 'explanations'>('sessions')
+  const [expandedHelp, setExpandedHelp] = useState<string | null>(null)
 
   useEffect(() => {
     if (loaded && !userId) { router.replace('/'); return }
@@ -40,9 +56,11 @@ export default function ProgressPage() {
       Promise.all([
         fetch(`/api/reports/${userId}`).then(r => r.json()),
         fetch(`/api/daily-stats/${userId}`).then(r => r.json()),
-      ]).then(([reports, stats]) => {
+        fetch(`/api/help-sessions/${userId}`).then(r => r.json()),
+      ]).then(([reports, stats, help]) => {
         setSessions(reports.sessions || [])
         setUserName(stats.user?.name || '')
+        setHelpSessions(help.sessions || [])
         setLoading(false)
       }).catch(() => setLoading(false))
     }
@@ -100,41 +118,118 @@ export default function ProgressPage() {
           </div>
         </div>
 
-        {/* Sessions List */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-100">
-            <h2 className="font-bold text-slate-700">آخر الجلسات</h2>
-          </div>
-          {sessions.length === 0 ? (
-            <div className="p-8 text-center">
-              <div className="text-5xl mb-3">📭</div>
-              <p className="text-slate-400">مفيش جلسات لسه</p>
-              <button onClick={() => router.push('/study')} className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-xl font-bold text-sm">ابدأ دلوقتي!</button>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-50">
-              {sessions.map(s => (
-                <div key={s.id} className="p-4 flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-slate-700 text-sm">{SUBJECT_LABELS[s.subject as Subject] || s.subject}</span>
-                      {s.duration_minutes > 0 && (
-                        <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">⏱ {formatMinutes(s.duration_minutes)}</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-400">{new Date(s.created_at).toLocaleDateString('ar-EG', { month: 'long', day: 'numeric' })}</p>
-                  </div>
-                  <div className="mr-3">
-                    {s.reports?.length > 0
-                      ? <ScoreBadge score={s.reports[0].total_score} />
-                      : <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-xl">من غير اختبار</span>
-                    }
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        {/* Tabs */}
+        <div className="flex bg-white rounded-2xl p-1 shadow-sm mb-4 gap-1">
+          <button
+            onClick={() => setTab('sessions')}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${tab === 'sessions' ? 'bg-blue-500 text-white shadow' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            📚 جلساتي
+          </button>
+          <button
+            onClick={() => setTab('explanations')}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${tab === 'explanations' ? 'bg-violet-500 text-white shadow' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            🤖 شروحاتي
+          </button>
         </div>
+
+        {/* Sessions Tab */}
+        {tab === 'sessions' && (
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100">
+              <h2 className="font-bold text-slate-700">آخر الجلسات</h2>
+            </div>
+            {sessions.length === 0 ? (
+              <div className="p-8 text-center">
+                <div className="text-5xl mb-3">📭</div>
+                <p className="text-slate-400">مفيش جلسات لسه</p>
+                <button onClick={() => router.push('/study')} className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-xl font-bold text-sm">ابدأ دلوقتي!</button>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {sessions.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => router.push(`/session/${s.id}`)}
+                    className="w-full p-4 flex items-center justify-between text-right hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-slate-700 text-sm">{SUBJECT_LABELS[s.subject as Subject] || s.subject}</span>
+                        {s.duration_minutes > 0 && (
+                          <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">⏱ {formatMinutes(s.duration_minutes)}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400">{new Date(s.created_at).toLocaleDateString('ar-EG', { month: 'long', day: 'numeric' })}</p>
+                    </div>
+                    <div className="flex items-center gap-2 mr-3">
+                      {s.reports?.length > 0
+                        ? <ScoreBadge score={s.reports[0].total_score} />
+                        : <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-xl">من غير اختبار</span>
+                      }
+                      <span className="text-slate-300 text-sm">›</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Explanations Tab */}
+        {tab === 'explanations' && (
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100">
+              <h2 className="font-bold text-slate-700">شروحات المساعد الذكي</h2>
+            </div>
+            {helpSessions.length === 0 ? (
+              <div className="p-8 text-center">
+                <div className="text-5xl mb-3">🤖</div>
+                <p className="text-slate-400">مفيش شروحات لسه</p>
+                <button onClick={() => router.push('/help')} className="mt-4 px-6 py-2 bg-violet-500 text-white rounded-xl font-bold text-sm">اسأل المساعد!</button>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {helpSessions.map(h => (
+                  <div key={h.id} className="overflow-hidden">
+                    <button
+                      onClick={() => setExpandedHelp(expandedHelp === h.id ? null : h.id)}
+                      className="w-full p-4 flex items-start justify-between text-right hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">{SUBJECT_EMOJIS[h.subject] ?? '📚'}</span>
+                          <span className="font-semibold text-slate-700 text-sm">{SUBJECT_LABELS[h.subject as Subject] || h.subject}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 leading-snug line-clamp-2">{h.question || 'سؤال من صور'}</p>
+                        <p className="text-xs text-slate-400 mt-1">{new Date(h.created_at).toLocaleDateString('ar-EG', { month: 'long', day: 'numeric' })}</p>
+                      </div>
+                      <span className="text-slate-300 text-lg mr-2 flex-shrink-0 mt-1">{expandedHelp === h.id ? '▲' : '▼'}</span>
+                    </button>
+                    {expandedHelp === h.id && (
+                      <div className="px-4 pb-4">
+                        {h.question && (
+                          <div className="bg-slate-50 rounded-xl p-3 mb-3">
+                            <p className="text-xs text-slate-400 mb-1">سؤالك هو</p>
+                            <p className="text-sm text-slate-700">{h.question}</p>
+                          </div>
+                        )}
+                        <div className="bg-gradient-to-br from-violet-50 to-blue-50 border border-violet-100 rounded-xl p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xl">🤖</span>
+                            <span className="font-bold text-violet-700 text-xs">شرح المساعد الذكي</span>
+                          </div>
+                          <p className="text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">{h.explanation}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Start New Study */}
         <button

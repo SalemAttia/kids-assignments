@@ -81,6 +81,18 @@ export async function POST(req: NextRequest) {
     })
     await supabase.from('answers').insert(answerRows)
 
+    // Build full answers review (all questions, not just mistakes)
+    const allAnswersReview = questionsAndAnswers.map(q => {
+      const pq = evaluation.per_question.find(p => p.question_id === q.question_id)
+      return {
+        question_text: q.question_text,
+        student_answer: q.student_answer,
+        correct_answer: q.correct_answer,
+        is_correct: pq?.is_correct ?? false,
+        explanation: pq?.explanation || '',
+      }
+    })
+
     // Insert report
     const { data: report } = await supabase
       .from('reports')
@@ -90,6 +102,7 @@ export async function POST(req: NextRequest) {
         feedback: evaluation.feedback,
         mistakes: evaluation.mistakes,
         suggestions: evaluation.suggestions,
+        all_answers_review: allAnswersReview,
       })
       .select()
       .single()
@@ -108,18 +121,6 @@ export async function POST(req: NextRequest) {
         last_active: new Date().toISOString().split('T')[0],
       })
       .eq('id', user.id)
-
-    // Build full answers review (all questions, not just mistakes)
-    const allAnswersReview = questionsAndAnswers.map(q => {
-      const pq = evaluation.per_question.find(p => p.question_id === q.question_id)
-      return {
-        question_text: q.question_text,
-        student_answer: q.student_answer,
-        correct_answer: q.correct_answer,
-        is_correct: pq?.is_correct ?? false,
-        explanation: pq?.explanation || '',
-      }
-    })
 
     return NextResponse.json({
       report: {

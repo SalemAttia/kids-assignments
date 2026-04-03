@@ -109,3 +109,17 @@ CREATE POLICY "public read study-images" ON storage.objects
 
 CREATE POLICY "public delete study-images" ON storage.objects
   FOR DELETE USING (bucket_id = 'study-images');
+
+-- Persist full Q&A review with per-question AI explanations for revisiting past sessions
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS all_answers_review JSONB;
+
+-- Save help page AI explanations so students can revisit them
+CREATE TABLE IF NOT EXISTS help_sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  subject TEXT NOT NULL,
+  question TEXT NOT NULL,
+  explanation TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_help_sessions_user_id ON help_sessions(user_id, created_at DESC);
