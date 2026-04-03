@@ -9,6 +9,15 @@ import { z } from 'zod'
 
 const RequestSchema = z.object({ userId: z.string().uuid() })
 
+type StudyReport = { total_score: number; mistakes?: Array<{ explanation: string }> }
+
+function normalizeToArray<T>(value: unknown): T[] {
+  if (!value) return []
+  if (Array.isArray(value)) return value as T[]
+  if (typeof value === 'object') return [value as T]
+  return []
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { userId } = RequestSchema.parse(await req.json())
@@ -30,12 +39,15 @@ export async function POST(req: NextRequest) {
       .gte('created_at', weekStart.toISOString())
 
     const allSessions = sessions || []
-    const scores = allSessions.flatMap(s => (s.reports as Array<{total_score: number}> || []).map(r => r.total_score))
+
+    const scores = allSessions.flatMap(s =>
+      normalizeToArray<StudyReport>((s as any).reports).map(r => r.total_score),
+    )
     const subjectScores: Record<string, number[]> = {}
 
     allSessions.forEach(s => {
       if (!subjectScores[s.subject]) subjectScores[s.subject] = []
-      const score = (s.reports as Array<{total_score: number}> || [])[0]?.total_score
+      const score = normalizeToArray<StudyReport>((s as any).reports)[0]?.total_score
       if (score !== undefined) subjectScores[s.subject].push(score)
     })
 
@@ -47,8 +59,11 @@ export async function POST(req: NextRequest) {
     const bestSubject = subjectAvgs[0]?.subject || 'غير محدد'
     const worstSubject = subjectAvgs[subjectAvgs.length - 1]?.subject || 'غير محدد'
     const commonMistakes = allSessions
-      .flatMap(s => (s.reports as Array<{mistakes: Array<{explanation: string}>}> || [])
-        .flatMap(r => (r.mistakes || []).map(m => m.explanation)))
+      .flatMap(s =>
+        normalizeToArray<StudyReport>((s as any).reports).flatMap(r =>
+          normalizeToArray<{ explanation: string }>(r.mistakes).map(m => m.explanation),
+        ),
+      )
       .slice(0, 3)
 
     const prompt = buildWeeklySummaryPrompt({

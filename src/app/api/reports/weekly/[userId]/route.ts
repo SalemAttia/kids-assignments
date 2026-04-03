@@ -3,6 +3,15 @@ import { createServerClient } from '@/lib/supabase/server'
 import { SUBJECT_LABELS } from '@/types'
 import type { Subject } from '@/types'
 
+type StudyReport = { total_score: number }
+
+function normalizeToArray<T>(value: unknown): T[] {
+  if (!value) return []
+  if (Array.isArray(value)) return value as T[]
+  if (typeof value === 'object') return [value as T]
+  return []
+}
+
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params
   const supabase = await createServerClient()
@@ -22,7 +31,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const sessions = data || []
-  const scores = sessions.flatMap(s => (s.reports as Array<{total_score: number}> || []).map(r => r.total_score))
+  const scores = sessions.flatMap(s =>
+    normalizeToArray<StudyReport>((s as any).reports).map(r => r.total_score),
+  )
   const subjectCounts = sessions.reduce((acc, s) => {
     acc[s.subject] = (acc[s.subject] || 0) + 1
     return acc
