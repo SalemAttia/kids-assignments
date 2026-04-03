@@ -9,7 +9,7 @@ CREATE TABLE users (
   last_active DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-INSERT INTO users (name, grade) VALUES ('أحمد', 9), ('محمود', 6);
+INSERT INTO users (name, grade) VALUES ('أحمد', 8), ('محمود', 6);
 
 CREATE TABLE study_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

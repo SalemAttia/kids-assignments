@@ -38,6 +38,15 @@ interface WeeklySummaryData {
 type PrayerKey = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha'
 interface PrayerLog { prayer_date: string; fajr: boolean; dhuhr: boolean; asr: boolean; maghrib: boolean; isha: boolean }
 
+function gradeLabel(grade: number) {
+  const names: Record<number, string> = {
+    1: 'الأول ابتدائي',   2: 'الثاني ابتدائي',  3: 'الثالث ابتدائي',
+    4: 'الرابع ابتدائي',  5: 'الخامس ابتدائي',  6: 'السادسة ابتدائي',
+    7: 'الأول إعدادي',    8: 'الثاني إعدادي',   9: 'الثالث إعدادي',
+  }
+  return names[grade] ?? `الصف ${grade}`
+}
+
 const PRAYER_KEYS: PrayerKey[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
 const PRAYER_LABELS: Record<PrayerKey, string> = {
   fajr: 'فجر', dhuhr: 'ظهر', asr: 'عصر', maghrib: 'مغرب', isha: 'عشاء',
@@ -177,10 +186,10 @@ export default function ParentDashboard() {
           return (
             <div key={user.id} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm mb-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="text-4xl">{user.grade === 6 ? '🧒' : '👦'}</div>
+                <div className="text-4xl">{user.grade <= 6 ? '🧒' : '👦'}</div>
                 <div>
                   <h2 className="text-2xl font-bold text-blue-800">{user.name}</h2>
-                  <p className="text-slate-500">الصف {user.grade === 6 ? 'السادسة ابتدائي' : 'التالتة إعدادي'} · {user.points} نقطة · 🔥 {user.streak} يوم</p>
+                  <p className="text-slate-500">الصف {gradeLabel(user.grade)} · {user.points} نقطة · 🔥 {user.streak} يوم</p>
                 </div>
               </div>
 

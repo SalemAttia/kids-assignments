@@ -7,7 +7,16 @@ import type { User } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
-const AVATARS: Record<number, string> = { 6: '🧒', 9: '👦' }
+const AVATARS: Record<number, string> = { 6: '🧒', 7: '👦', 8: '👦', 9: '👦' }
+
+function gradeLabel(grade: number) {
+  const names: Record<number, string> = {
+    1: 'الأول ابتدائي',   2: 'الثاني ابتدائي',  3: 'الثالث ابتدائي',
+    4: 'الرابع ابتدائي',  5: 'الخامس ابتدائي',  6: 'السادسة ابتدائي',
+    7: 'الأول إعدادي',    8: 'الثاني إعدادي',   9: 'الثالث إعدادي',
+  }
+  return names[grade] ?? `الصف ${grade}`
+}
 const BG_COLORS = ['from-blue-400 to-purple-500', 'from-pink-400 to-orange-400']
 
 export default function HomePage() {
@@ -69,7 +78,7 @@ export default function HomePage() {
             <div className="text-6xl mb-3 drop-shadow">{AVATARS[user.grade] || '👤'}</div>
             <div className="text-2xl font-black text-white drop-shadow">{user.name}</div>
             <div className="text-white/80 text-sm mt-1">
-              الصف {user.grade === 6 ? 'السادسة' : 'التالتة'}
+              {gradeLabel(user.grade)}
             </div>
             {user.streak > 0 && (
               <div className="mt-3 bg-white/20 rounded-full px-3 py-1 text-sm text-white font-bold inline-block">

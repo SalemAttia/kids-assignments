@@ -118,7 +118,7 @@ export default function HelpPage() {
       const res = await fetch('/api/explain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, question: finalQuestion, imageBase64Array, grade: 6 }),
+        body: JSON.stringify({ subject, question: finalQuestion, imageBase64Array }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
