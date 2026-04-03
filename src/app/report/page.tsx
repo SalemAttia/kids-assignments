@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useStudySession } from '@/hooks/useStudySession'
 import type { Report } from '@/types'
+import BottomNav from '@/components/BottomNav'
 
 interface AnswerReview {
   question_text: string
@@ -92,7 +93,7 @@ export default function ReportPage() {
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4 relative" dir="rtl">
       {isExcellent && <Confetti />}
 
-      <div className="max-w-lg mx-auto pt-2 pb-10 space-y-4 relative z-10">
+      <div className="max-w-lg mx-auto pt-2 pb-28 space-y-4 relative z-10">
 
         {/* Score Hero */}
         <div className={`bg-gradient-to-br ${scoreBg} rounded-3xl p-8 text-center text-white shadow-2xl`}>
@@ -204,6 +205,8 @@ export default function ReportPage() {
           </button>
         </div>
       </div>
+
+      <BottomNav />
     </main>
   )
 }

@@ -6,6 +6,7 @@ import { useStudySession } from '@/hooks/useStudySession'
 import { uploadStudyImages } from '@/lib/supabase/storage'
 import { type Subject } from '@/types'
 import { useEffect } from 'react'
+import BottomNav from '@/components/BottomNav'
 
 const SUBJECTS: { value: Subject; label: string; emoji: string; color: string; bg: string }[] = [
   { value: 'arabic',        label: 'اللغة العربية',      emoji: '📖', color: 'from-purple-500 to-purple-600',  bg: 'bg-purple-50 border-purple-300' },
@@ -169,7 +170,7 @@ export default function StudyPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4" dir="rtl">
-      <div className="max-w-xl mx-auto">
+      <div className="max-w-xl mx-auto pb-28">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6 pt-2">
@@ -405,6 +406,8 @@ export default function StudyPage() {
         )}
 
       </div>
+
+      <BottomNav />
     </main>
   )
 }

@@ -5,6 +5,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useStudySession } from '@/hooks/useStudySession'
 import { createClient } from '@/lib/supabase/client'
 import type { Question } from '@/types'
+import BottomNav from '@/components/BottomNav'
 
 const ENCOURAGEMENTS = [
   'برافو! كمل! 💪',
@@ -153,7 +154,7 @@ export default function QuizPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4" dir="rtl">
-      <div className="max-w-2xl mx-auto pb-6">
+      <div className="max-w-2xl mx-auto pb-28">
 
         {/* Header */}
         <div className="mb-5">
@@ -298,6 +299,8 @@ export default function QuizPage() {
           </div>
         </div>
       )}
+
+      <BottomNav />
     </main>
   )
 }
