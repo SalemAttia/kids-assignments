@@ -17,5 +17,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ sessions: data })
+
+  // Normalize: Supabase may return reports as object or array depending on the FK uniqueness
+  const sessions = (data || []).map(s => ({
+    ...s,
+    reports: s.reports
+      ? (Array.isArray(s.reports) ? s.reports : [s.reports])
+      : [],
+  }))
+
+  return NextResponse.json({ sessions })
 }

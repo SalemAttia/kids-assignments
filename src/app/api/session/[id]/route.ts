@@ -17,5 +17,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
-  return NextResponse.json({ session: data })
+  // Normalize: Supabase may return reports as object or array depending on FK uniqueness
+  const session = {
+    ...data,
+    reports: data.reports
+      ? (Array.isArray(data.reports) ? data.reports : [data.reports])
+      : [],
+  }
+
+  return NextResponse.json({ session })
 }
