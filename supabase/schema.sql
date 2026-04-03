@@ -70,6 +70,21 @@ CREATE TABLE weekly_summaries (
 
 ALTER TABLE study_sessions ADD COLUMN IF NOT EXISTS duration_minutes INT NOT NULL DEFAULT 0;
 
+-- Daily prayer tracking (5 Islamic prayers per day)
+CREATE TABLE IF NOT EXISTS prayer_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  prayer_date DATE NOT NULL,
+  fajr BOOLEAN NOT NULL DEFAULT FALSE,
+  dhuhr BOOLEAN NOT NULL DEFAULT FALSE,
+  asr BOOLEAN NOT NULL DEFAULT FALSE,
+  maghrib BOOLEAN NOT NULL DEFAULT FALSE,
+  isha BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, prayer_date)
+);
+CREATE INDEX IF NOT EXISTS idx_prayer_logs_user_date ON prayer_logs(user_id, prayer_date DESC);
+
 -- Storage: create bucket and open RLS policies (app uses custom auth, not Supabase Auth)
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('study-images', 'study-images', true)

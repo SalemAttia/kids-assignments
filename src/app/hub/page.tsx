@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 
@@ -9,6 +9,17 @@ interface DailyStats {
   week: { sessionCount: number; totalMinutes: number; dailyBreakdown: { label: string; minutes: number; sessions: number }[] }
 }
 
+type PrayerKey = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha'
+interface PrayerLog { prayer_date: string; fajr: boolean; dhuhr: boolean; asr: boolean; maghrib: boolean; isha: boolean }
+
+const PRAYERS: { key: PrayerKey; label: string; emoji: string }[] = [
+  { key: 'fajr',    label: 'الفجر',   emoji: '🌅' },
+  { key: 'dhuhr',   label: 'الظهر',   emoji: '☀️' },
+  { key: 'asr',     label: 'العصر',   emoji: '🌤️' },
+  { key: 'maghrib', label: 'المغرب',  emoji: '🌇' },
+  { key: 'isha',    label: 'العشاء',  emoji: '🌙' },
+]
+
 function formatMinutes(m: number) {
   if (m === 0) return 'مفيش لسه'
   if (m < 60) return `${m} دقيقة`
@@ -17,13 +28,17 @@ function formatMinutes(m: number) {
   return mins > 0 ? `${h} ساعة و${mins} دقيقة` : `${h} ساعة`
 }
 
-const GOAL_MINUTES = 60 // daily goal
+const GOAL_MINUTES = 60
 
 export default function HubPage() {
   const router = useRouter()
   const { userId, loaded, clearUser } = useCurrentUser()
   const [stats, setStats] = useState<DailyStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [prayers, setPrayers] = useState<PrayerLog | null>(null)
+  const [prayerSaving, setPrayerSaving] = useState<PrayerKey | null>(null)
+
+  const today = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
     if (loaded && !userId) { router.replace('/'); return }
@@ -32,8 +47,38 @@ export default function HubPage() {
         .then(r => r.json())
         .then(d => { setStats(d); setLoading(false) })
         .catch(() => setLoading(false))
+
+      fetch(`/api/prayers/${userId}?date=${today}`)
+        .then(r => r.json())
+        .then(d => setPrayers(d))
+        .catch(() => {})
     }
-  }, [loaded, userId, router])
+  }, [loaded, userId, router, today])
+
+  const togglePrayer = useCallback(async (prayer: PrayerKey) => {
+    if (!userId || prayerSaving) return
+    const current = prayers?.[prayer] ?? false
+    const next = !current
+
+    // Optimistic update
+    setPrayers(prev => prev ? { ...prev, [prayer]: next } : {
+      prayer_date: today, fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false, [prayer]: next,
+    })
+    setPrayerSaving(prayer)
+
+    try {
+      await fetch('/api/prayers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, date: today, prayer, done: next }),
+      })
+    } catch {
+      // Revert on failure
+      setPrayers(prev => prev ? { ...prev, [prayer]: current } : null)
+    } finally {
+      setPrayerSaving(null)
+    }
+  }, [userId, prayers, prayerSaving, today])
 
   if (!loaded || loading) return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -44,11 +89,16 @@ export default function HubPage() {
     </div>
   )
 
-  const today = stats?.today
+  const todayStats = stats?.today
   const week = stats?.week
   const user = stats?.user
-  const progressPct = Math.min(100, Math.round(((today?.totalMinutes || 0) / GOAL_MINUTES) * 100))
-  const goalReached = (today?.totalMinutes || 0) >= GOAL_MINUTES
+  const progressPct = Math.min(100, Math.round(((todayStats?.totalMinutes || 0) / GOAL_MINUTES) * 100))
+  const goalReached = (todayStats?.totalMinutes || 0) >= GOAL_MINUTES
+
+  const prayersDone = prayers
+    ? PRAYERS.filter(p => prayers[p.key]).length
+    : 0
+  const allPrayersDone = prayersDone === 5
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4" dir="rtl">
@@ -82,10 +132,53 @@ export default function HubPage() {
           </div>
         </div>
 
+        {/* Prayer Tracker */}
+        <div className={`rounded-2xl p-5 shadow-sm mb-4 ${allPrayersDone ? 'bg-gradient-to-r from-teal-500 to-emerald-500' : 'bg-white'}`}>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className={`font-bold text-base ${allPrayersDone ? 'text-white' : 'text-slate-700'}`}>
+                صلوات اليوم 🤲
+              </h2>
+              <p className={`text-xs mt-0.5 ${allPrayersDone ? 'text-teal-100' : 'text-slate-400'}`}>
+                {allPrayersDone ? 'ما شاء الله! كملت كل الصلوات 🎉' : `${prayersDone} من 5 صلوات`}
+              </p>
+            </div>
+            <div className={`text-2xl font-bold ${allPrayersDone ? 'text-white' : 'text-teal-600'}`}>
+              {prayersDone}/5
+            </div>
+          </div>
+
+          <div className="grid grid-cols-5 gap-2">
+            {PRAYERS.map(p => {
+              const done = prayers?.[p.key] ?? false
+              const saving = prayerSaving === p.key
+              return (
+                <button
+                  key={p.key}
+                  onClick={() => togglePrayer(p.key)}
+                  disabled={saving}
+                  className={`flex flex-col items-center gap-1.5 py-3 rounded-xl transition-all active:scale-95 ${
+                    done
+                      ? allPrayersDone
+                        ? 'bg-white/20 text-white'
+                        : 'bg-teal-500 text-white shadow-md'
+                      : allPrayersDone
+                        ? 'bg-white/10 text-white/60'
+                        : 'bg-slate-50 text-slate-400 border border-slate-100'
+                  } ${saving ? 'opacity-50' : ''}`}
+                >
+                  <span className="text-lg leading-none">{done ? '✅' : p.emoji}</span>
+                  <span className="text-[10px] font-bold leading-tight">{p.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         {/* Daily Goal */}
         <div className="bg-white rounded-2xl p-5 shadow-sm mb-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-slate-700">هدف النهارده</h2>
+            <h2 className="font-bold text-slate-700">هدف المذاكرة النهارده</h2>
             <span className="text-sm font-medium text-blue-600">{goalReached ? '🎉 برافو عليك!' : `${progressPct}%`}</span>
           </div>
           <div className="w-full bg-slate-100 rounded-full h-3 mb-3">
@@ -95,7 +188,7 @@ export default function HubPage() {
             />
           </div>
           <div className="flex justify-between text-xs text-slate-400">
-            <span>وقت المذاكرة: <span className="font-semibold text-slate-600">{formatMinutes(today?.totalMinutes || 0)}</span></span>
+            <span>وقت المذاكرة: <span className="font-semibold text-slate-600">{formatMinutes(todayStats?.totalMinutes || 0)}</span></span>
             <span>الهدف: {formatMinutes(GOAL_MINUTES)}</span>
           </div>
         </div>
@@ -104,12 +197,12 @@ export default function HubPage() {
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div className="bg-white rounded-2xl p-4 shadow-sm text-center">
             <div className="text-2xl mb-1">📖</div>
-            <div className="text-xl font-bold text-blue-600">{today?.subjectCount || 0}</div>
+            <div className="text-xl font-bold text-blue-600">{todayStats?.subjectCount || 0}</div>
             <div className="text-xs text-slate-400">مادة النهارده</div>
           </div>
           <div className="bg-white rounded-2xl p-4 shadow-sm text-center">
             <div className="text-2xl mb-1">✅</div>
-            <div className="text-xl font-bold text-green-600">{today?.sessionCount || 0}</div>
+            <div className="text-xl font-bold text-green-600">{todayStats?.sessionCount || 0}</div>
             <div className="text-xs text-slate-400">جلسة النهارده</div>
           </div>
           <div className="bg-white rounded-2xl p-4 shadow-sm text-center">
@@ -120,11 +213,11 @@ export default function HubPage() {
         </div>
 
         {/* Today's Subjects */}
-        {(today?.subjects?.length || 0) > 0 && (
+        {(todayStats?.subjects?.length || 0) > 0 && (
           <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
             <p className="text-xs text-slate-400 mb-3 font-medium">ذاكرت النهارده</p>
             <div className="flex flex-wrap gap-2">
-              {today!.subjects.map(s => (
+              {todayStats!.subjects.map(s => (
                 <span key={s.key} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-sm font-medium">
                   {s.label}
                 </span>
@@ -133,7 +226,7 @@ export default function HubPage() {
           </div>
         )}
 
-        {/* Weekly bar chart (simple CSS) */}
+        {/* Weekly bar chart */}
         {(week?.dailyBreakdown?.length || 0) > 0 && (
           <div className="bg-white rounded-2xl p-4 shadow-sm mb-6">
             <p className="text-xs text-slate-400 mb-3 font-medium">مذاكرة الأسبوع ده (بالدقائق)</p>
