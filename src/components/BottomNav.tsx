@@ -5,6 +5,7 @@ const TABS = [
   { href: '/hub',      emoji: '🏠', label: 'الرئيسية' },
   { href: '/study',    emoji: '📚', label: 'اذاكر'    },
   { href: '/schedule', emoji: '📅', label: 'جدولي'    },
+  { href: '/progress', emoji: '📊', label: 'تقدمي'    },
   { href: '/help',     emoji: '🤖', label: 'مساعد'    },
 ]
 

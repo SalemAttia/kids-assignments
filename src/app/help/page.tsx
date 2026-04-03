@@ -123,6 +123,13 @@ export default function HelpPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setExplanation(data.explanation)
+      if (userId) {
+        fetch('/api/help-sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, subject, question: finalQuestion, explanation: data.explanation }),
+        }).catch(() => {})
+      }
     } catch {
       setExplanation('آسف، في مشكلة. حاول تاني!')
     } finally {
