@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { SUBJECT_LABELS, type Subject } from '@/types'
+import BottomNav from '@/components/BottomNav'
 
 const SUBJECTS: { value: Subject; emoji: string; label: string; color: string }[] = [
   { value: 'arabic',         emoji: '📖', label: 'اللغة العربية',       color: 'from-purple-500 to-purple-600' },
@@ -146,7 +147,7 @@ export default function HelpPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-violet-50 via-blue-50 to-cyan-50 p-4" dir="rtl">
-      <div className="max-w-md mx-auto pt-2 pb-10">
+      <div className="max-w-md mx-auto pt-2 pb-28">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
@@ -384,7 +385,7 @@ export default function HelpPage() {
           </div>
         )}
 
-      </div>
+      <BottomNav />
     </main>
   )
 }

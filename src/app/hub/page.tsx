@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import BottomNav from '@/components/BottomNav'
 
 interface DailyStats {
   user: { name: string; points: number; streak: number; grade: number }
@@ -102,7 +103,7 @@ export default function HubPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4" dir="rtl">
-      <div className="max-w-md mx-auto pt-4 pb-24">
+      <div className="max-w-md mx-auto pt-4 pb-32">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -251,34 +252,18 @@ export default function HubPage() {
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="space-y-3">
-          <button
-            onClick={() => router.push('/study')}
-            className="w-full py-5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xl font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3"
-          >
-            <span>📚</span>
-            <span>ابدأ مذاكرة جديدة</span>
-          </button>
-
-          <button
-            onClick={() => router.push('/help')}
-            className="w-full py-4 bg-gradient-to-r from-violet-500 to-cyan-500 text-white text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3"
-          >
-            <span>🤖</span>
-            <span>ساعدني في الفهم</span>
-          </button>
-
-          <button
-            onClick={() => router.push('/progress')}
-            className="w-full py-4 bg-white text-slate-700 text-lg font-bold rounded-2xl shadow-sm hover:shadow-md transition-all active:scale-95 border-2 border-slate-100 flex items-center justify-center gap-3"
-          >
-            <span>📊</span>
-            <span>تقدمي وأدائي</span>
-          </button>
-        </div>
+        {/* Start Study CTA */}
+        <button
+          onClick={() => router.push('/study')}
+          className="w-full py-5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xl font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3"
+        >
+          <span>📚</span>
+          <span>ابدأ مذاكرة جديدة!</span>
+        </button>
 
       </div>
+
+      <BottomNav />
     </main>
   )
 }

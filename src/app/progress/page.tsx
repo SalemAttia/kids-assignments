@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { SUBJECT_LABELS } from '@/types'
 import type { Subject } from '@/types'
+import BottomNav from '@/components/BottomNav'
 
 interface Session {
   id: string
@@ -61,7 +62,7 @@ export default function ProgressPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4" dir="rtl">
-      <div className="max-w-md mx-auto pt-2 pb-10">
+      <div className="max-w-md mx-auto pt-2 pb-28">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
@@ -144,6 +145,8 @@ export default function ProgressPage() {
         </button>
 
       </div>
+
+      <BottomNav />
     </main>
   )
 }
