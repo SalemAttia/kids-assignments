@@ -6,6 +6,8 @@ const SessionSchema = z.object({
   userId: z.string().uuid(),
   subject: z.string(),
   description: z.string().min(5),
+  imageUrls: z.array(z.string().url()).optional(),
+  // legacy single-image field – kept for backward compatibility
   imageUrl: z.string().url().optional(),
   durationMinutes: z.number().int().min(0).optional(),
 })
@@ -13,7 +15,20 @@ const SessionSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { userId, subject, description, imageUrl, durationMinutes } = SessionSchema.parse(body)
+    const { userId, subject, description, imageUrls, imageUrl, durationMinutes } = SessionSchema.parse(body)
+
+    // Merge: imageUrls takes precedence; fall back to single imageUrl
+    const allUrls: string[] = imageUrls && imageUrls.length > 0
+      ? imageUrls
+      : imageUrl ? [imageUrl] : []
+
+    // Store as JSON array string so the quiz page can parse multiple URLs.
+    // Single-image sessions store a plain URL string for backward compat.
+    const storedImageUrl = allUrls.length === 0
+      ? null
+      : allUrls.length === 1
+        ? allUrls[0]
+        : JSON.stringify(allUrls)
 
     const supabase = await createServerClient()
     const { data, error } = await supabase
@@ -22,7 +37,7 @@ export async function POST(req: NextRequest) {
         user_id: userId,
         subject,
         description,
-        image_url: imageUrl ?? null,
+        image_url: storedImageUrl,
         duration_minutes: durationMinutes ?? 0,
       })
       .select('id')

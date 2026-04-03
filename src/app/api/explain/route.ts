@@ -18,21 +18,27 @@ const QUICK_ACTIONS: Record<Subject, string[]> = {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { subject, question, imageBase64, grade = 6 } = body
+    const { subject, question, imageBase64, imageBase64Array, grade = 6 } = body
 
     if (!subject || !question?.trim()) {
       return NextResponse.json({ error: 'يرجى إدخال السؤال والمادة' }, { status: 400 })
     }
+
+    // Support both legacy single image and new multiple images
+    const images: string[] = imageBase64Array && imageBase64Array.length > 0
+      ? imageBase64Array
+      : imageBase64 ? [imageBase64] : []
 
     const subjectLabel = SUBJECT_LABELS[subject as Subject] || subject
     const openai = getOpenAI()
 
     const userContent: OpenAI.Chat.ChatCompletionContentPart[] = []
 
-    if (imageBase64) {
+    // Add all images first
+    for (const img of images) {
       userContent.push({
         type: 'image_url',
-        image_url: { url: imageBase64, detail: 'high' },
+        image_url: { url: img, detail: 'high' },
       })
     }
 
@@ -42,7 +48,7 @@ export async function POST(req: NextRequest) {
 الصف: ${grade}
 السؤال أو ما لا أفهمه: ${question}
 
-${imageBase64 ? 'الصورة المرفقة تُظهر ما لا أفهمه.' : ''}
+${images.length > 0 ? `الصور المرفقة (${images.length} صورة) تُظهر ما لا أفهمه.` : ''}
 
 اشرح لي بطريقة بسيطة جداً كأنك تشرح لطفل صغير، استخدم أمثلة من الحياة اليومية، وكن ودوداً ومشجعاً.`,
     })

@@ -5,6 +5,15 @@ import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useStudySession } from '@/hooks/useStudySession'
 import { createClient } from '@/lib/supabase/client'
 import type { Question } from '@/types'
+import BottomNav from '@/components/BottomNav'
+
+const ENCOURAGEMENTS = [
+  'برافو! كمل! 💪',
+  'ممتاز! استمر! 🌟',
+  'أنت بطل! 🏆',
+  'رائع! كمل! 🎉',
+  'شاطر! الجاي! 🚀',
+]
 
 export default function QuizPage() {
   const router = useRouter()
@@ -17,6 +26,8 @@ export default function QuizPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [showExitSheet, setShowExitSheet] = useState(false)
+  const [justAnswered, setJustAnswered] = useState(false)
 
   useEffect(() => {
     if (!loaded) return
@@ -31,7 +42,6 @@ export default function QuizPage() {
       return
     }
 
-    // Fetch user grade, then generate questions
     const generate = async () => {
       const { data: session } = await createClient()
         .from('study_sessions')
@@ -41,6 +51,17 @@ export default function QuizPage() {
 
       if (!session) { router.replace('/study'); return }
 
+      // Parse image_url — may be a JSON array or a single URL
+      let imageUrls: string[] | undefined
+      if (session.image_url) {
+        try {
+          const parsed = JSON.parse(session.image_url)
+          imageUrls = Array.isArray(parsed) ? parsed : [session.image_url]
+        } catch {
+          imageUrls = [session.image_url]
+        }
+      }
+
       const res = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -49,7 +70,7 @@ export default function QuizPage() {
           subject: session.subject,
           description: session.description,
           grade: (session.users as unknown as {grade: number}).grade,
-          imageUrl: session.image_url || undefined,
+          imageUrls,
         }),
       })
       const data = await res.json()
@@ -65,6 +86,12 @@ export default function QuizPage() {
 
   function handleAnswer(questionId: string, value: string) {
     setAnswers(prev => ({ ...prev, [questionId]: value }))
+    setJustAnswered(true)
+    setTimeout(() => setJustAnswered(false), 600)
+  }
+
+  function handleNext() {
+    setCurrentIndex(i => i + 1)
   }
 
   function handleSkip() {
@@ -73,11 +100,9 @@ export default function QuizPage() {
   }
 
   async function handleSubmit() {
-    // Auto-fill skipped questions
     const finalAnswers = { ...answers }
     questions.forEach(q => { if (!finalAnswers[q.id]) finalAnswers[q.id] = 'مش عارف' })
     setAnswers(finalAnswers)
-
     setSubmitting(true)
     setError('')
 
@@ -105,58 +130,69 @@ export default function QuizPage() {
   }
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-      <div className="text-5xl animate-bounce">🤔</div>
-      <p className="text-xl text-blue-700 font-semibold">بيتم عمل الأسئلة...</p>
-      <p className="text-slate-500">استنى شوية</p>
+    <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-gradient-to-br from-blue-50 to-purple-50">
+      <div className="text-6xl animate-bounce">🤔</div>
+      <p className="text-xl text-blue-700 font-bold">بيتم عمل الأسئلة...</p>
+      <p className="text-slate-400 text-sm">استنى شوية!</p>
     </div>
   )
 
   if (error && questions.length === 0) return (
-    <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6">
-      <div className="text-5xl">❌</div>
-      <p className="text-xl text-red-600">{error}</p>
-      <button onClick={() => router.replace('/study')} className="px-6 py-3 bg-blue-600 text-white rounded-xl">
-        ارجع للمذاكرة
+    <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6 bg-gradient-to-br from-blue-50 to-purple-50">
+      <div className="text-6xl">😅</div>
+      <p className="text-xl text-red-600 font-bold text-center">{error}</p>
+      <button onClick={() => router.replace('/study')} className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold text-lg">
+        ارجع وحاول تاني
       </button>
     </div>
   )
 
   const current = questions[currentIndex]
   const progress = Math.round(((currentIndex + 1) / questions.length) * 100)
+  const encouragement = ENCOURAGEMENTS[currentIndex % ENCOURAGEMENTS.length]
+  const isAnswered = !!answers[current.id]
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-2xl mx-auto">
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4" dir="rtl">
+      <div className="max-w-2xl mx-auto pb-28">
+
         {/* Header */}
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <h1 className="text-xl font-bold text-blue-800">الأسئلة</h1>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-slate-500">سؤال {currentIndex + 1} من {questions.length}</span>
-              <button
-                onClick={() => {
-                  if (confirm('عايز تخلص الاختبار وترجع للصفحة الرئيسية؟')) {
-                    router.push('/hub')
-                  }
-                }}
-                className="text-xs text-slate-400 hover:text-red-500 bg-slate-100 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-colors"
-              >
-                ✕ خلاص
-              </button>
+        <div className="mb-5">
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-black text-blue-700">{currentIndex + 1}</span>
+              <span className="text-slate-400 text-sm font-medium">/ {questions.length}</span>
             </div>
+            <div className="text-sm font-bold text-purple-600 bg-purple-50 px-3 py-1 rounded-full">
+              {progress}% ✨
+            </div>
+            <button
+              onClick={() => setShowExitSheet(true)}
+              className="text-xs text-slate-400 hover:text-red-400 bg-white px-3 py-1.5 rounded-xl shadow-sm transition-colors"
+            >
+              ✕ خروج
+            </button>
           </div>
-          <div className="w-full bg-slate-200 rounded-full h-2">
+
+          {/* Progress bar */}
+          <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
             <div
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+              className="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
 
+        {/* Encouragement */}
+        {justAnswered && (
+          <div className="text-center text-green-600 font-bold text-lg mb-3 animate-bounce">
+            {encouragement}
+          </div>
+        )}
+
         {/* Question Card */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6">
-          <p className="text-lg font-semibold text-slate-800 mb-6 leading-relaxed">{current.question_text}</p>
+        <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-100 mb-5">
+          <p className="text-lg font-bold text-slate-800 mb-6 leading-relaxed">{current.question_text}</p>
 
           {current.question_type === 'multiple_choice' && current.options ? (
             <div className="space-y-3">
@@ -164,10 +200,10 @@ export default function QuizPage() {
                 <button
                   key={option}
                   onClick={() => handleAnswer(current.id, option)}
-                  className={`w-full text-right p-4 rounded-xl border-2 transition-all ${
+                  className={`w-full text-right p-4 rounded-2xl border-2 font-semibold transition-all active:scale-98 ${
                     answers[current.id] === option
-                      ? 'border-blue-500 bg-blue-50 text-blue-800 font-semibold'
-                      : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300'
+                      ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-md'
+                      : 'border-slate-100 bg-slate-50 text-slate-700 hover:border-blue-200 hover:bg-blue-50/50'
                   }`}
                 >
                   {option}
@@ -178,35 +214,34 @@ export default function QuizPage() {
             <textarea
               value={answers[current.id] || ''}
               onChange={(e) => handleAnswer(current.id, e.target.value)}
-              placeholder="اكتب إجابتك هنا..."
-              className="w-full h-32 p-4 border-2 border-slate-200 rounded-xl resize-none focus:outline-none focus:border-blue-400"
+              placeholder="اكتب إجابتك هنا... 📝"
+              className="w-full h-32 p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 resize-none focus:outline-none focus:border-blue-400 focus:bg-white text-slate-700 transition-all"
               dir="rtl"
             />
           )}
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 mb-4">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700 mb-4 text-center">
             {error}
           </div>
         )}
 
         {/* Navigation */}
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-3">
           {currentIndex > 0 && (
             <button
               onClick={() => setCurrentIndex(i => i - 1)}
-              className="flex-1 py-3 border-2 border-slate-300 text-slate-600 rounded-xl font-semibold hover:border-slate-400"
+              className="px-5 py-3.5 border-2 border-slate-200 bg-white text-slate-600 rounded-2xl font-bold hover:border-slate-300 transition-all"
             >
-              → الفات
+              → رجوع
             </button>
           )}
 
-          {/* Skip button */}
-          {!answers[current.id] && (
+          {!isAnswered && (
             <button
               onClick={handleSkip}
-              className="flex-1 py-3 border-2 border-orange-200 bg-orange-50 text-orange-600 rounded-xl font-semibold hover:bg-orange-100 transition-colors"
+              className="flex-1 py-3.5 border-2 border-orange-200 bg-orange-50 text-orange-600 rounded-2xl font-bold hover:bg-orange-100 transition-all"
             >
               🤷 مش عارف
             </button>
@@ -214,23 +249,58 @@ export default function QuizPage() {
 
           {currentIndex < questions.length - 1 ? (
             <button
-              onClick={() => setCurrentIndex(i => i + 1)}
-              disabled={!answers[current.id]}
-              className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-200 text-white rounded-xl font-semibold transition-colors"
+              onClick={handleNext}
+              disabled={!isAnswered}
+              className="flex-1 py-3.5 bg-gradient-to-r from-blue-500 to-purple-600 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-2xl font-bold text-lg shadow-md transition-all active:scale-95"
             >
-              ← الجاي
+              الجاي ←
             </button>
           ) : (
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-200 text-white rounded-xl font-bold text-lg transition-colors"
+              className="flex-1 py-3.5 bg-gradient-to-r from-green-500 to-teal-500 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-2xl font-black text-lg shadow-md transition-all active:scale-95"
             >
-              {submitting ? 'بيتم التقييم...' : '✅ سلم الإجابات'}
+              {submitting ? '⏳ بيتم التقييم...' : '✅ سلم الإجابات!'}
             </button>
           )}
         </div>
       </div>
+
+      {/* Exit Confirmation Sheet */}
+      {showExitSheet && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end" onClick={() => setShowExitSheet(false)}>
+          <div
+            className="w-full bg-white rounded-t-3xl p-6 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+            dir="rtl"
+          >
+            <div className="text-center mb-6">
+              <div className="text-5xl mb-3">🤔</div>
+              <h2 className="text-xl font-black text-slate-800">عايز تخرج؟</h2>
+              <p className="text-slate-500 text-sm mt-1">
+                إجاباتك مش هتتحفظ لو خرجت دلوقتي
+              </p>
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => router.push('/hub')}
+                className="w-full py-4 bg-red-500 text-white font-bold rounded-2xl text-lg active:scale-95 transition-all"
+              >
+                🚪 أيوه، خروج
+              </button>
+              <button
+                onClick={() => setShowExitSheet(false)}
+                className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold rounded-2xl text-lg active:scale-95 transition-all"
+              >
+                📚 لا، كمل معايا!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <BottomNav />
     </main>
   )
 }

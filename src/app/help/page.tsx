@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { SUBJECT_LABELS, type Subject } from '@/types'
+import { type Subject } from '@/types'
+import BottomNav from '@/components/BottomNav'
 
 const SUBJECTS: { value: Subject; emoji: string; label: string; color: string }[] = [
   { value: 'arabic',         emoji: '📖', label: 'اللغة العربية',       color: 'from-purple-500 to-purple-600' },
@@ -11,12 +12,11 @@ const SUBJECTS: { value: Subject; emoji: string; label: string; color: string }[
   { value: 'english',        emoji: '💬', label: 'اللغة الإنجليزية',    color: 'from-yellow-500 to-orange-500' },
   { value: 'social_studies', emoji: '🌍', label: 'الدراسات الاجتماعية', color: 'from-orange-500 to-red-500' },
   { value: 'religion',       emoji: '🌙', label: 'التربية الدينية',      color: 'from-teal-500 to-cyan-600' },
-  { value: 'computer',       emoji: '💻', label: 'الحاسب الآلي',         color: 'from-indigo-500 to-indigo-600' },
-  { value: 'art',            emoji: '🎨', label: 'التربية الفنية',       color: 'from-pink-500 to-rose-500' },
-  { value: 'other',          emoji: '⭐', label: 'أخرى',                 color: 'from-slate-500 to-slate-600' },
 ]
 
 type Step = 'subject' | 'question' | 'result'
+
+const MAX_IMAGES = 5
 
 export default function HelpPage() {
   const router = useRouter()
@@ -25,18 +25,15 @@ export default function HelpPage() {
   const [step, setStep] = useState<Step>('subject')
   const [subject, setSubject] = useState<Subject | null>(null)
   const [question, setQuestion] = useState('')
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [imageBase64, setImageBase64] = useState<string | null>(null)
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const [imageBase64Array, setImageBase64Array] = useState<string[]>([])
   const [explanation, setExplanation] = useState('')
-  const [quickActions, setQuickActions] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [listening, setListening] = useState(false)
 
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
-  // `SpeechRecognition` is not part of standard TS DOM lib typing in all environments.
-  // Keep this loosely typed so builds don't fail, while still working in browsers that support it.
   const recognitionRef = useRef<any>(null)
   const shouldListenRef = useRef(false)
 
@@ -44,15 +41,28 @@ export default function HelpPage() {
     if (loaded && !userId) router.replace('/')
   }, [loaded, userId, router])
 
-  function handleImageFile(file: File) {
-    if (file.size > 5 * 1024 * 1024) { setError('الصورة أكبر من 5 ميجابايت، اختار صورة أصغر'); return }
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string
-      setImagePreview(base64)
-      setImageBase64(base64)
-    }
-    reader.readAsDataURL(file)
+  function handleImageFiles(files: File[]) {
+    const remaining = MAX_IMAGES - imagePreviews.length
+    const toAdd = files.slice(0, remaining)
+
+    const oversized = toAdd.filter(f => f.size > 5 * 1024 * 1024)
+    if (oversized.length > 0) { setError('الصورة أكبر من 5 ميجابايت، اختار صورة أصغر'); return }
+
+    toAdd.forEach(file => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string
+        setImagePreviews(prev => [...prev, base64])
+        setImageBase64Array(prev => [...prev, base64])
+      }
+      reader.readAsDataURL(file)
+    })
+    setError('')
+  }
+
+  function removeImage(index: number) {
+    setImagePreviews(prev => prev.filter((_, i) => i !== index))
+    setImageBase64Array(prev => prev.filter((_, i) => i !== index))
   }
 
   function startRecognition() {
@@ -95,7 +105,10 @@ export default function HelpPage() {
 
   async function askAI(q?: string) {
     const finalQuestion = q || question
-    if (!subject || !finalQuestion.trim()) { setError('اكتب سؤالك أو اللي مش فاهمه'); return }
+    if (!subject || (!finalQuestion.trim() && imageBase64Array.length === 0)) {
+      setError('اكتب سؤالك أو اللي مش فاهمه')
+      return
+    }
     setError('')
     setLoading(true)
     setStep('result')
@@ -105,12 +118,11 @@ export default function HelpPage() {
       const res = await fetch('/api/explain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, question: finalQuestion, imageBase64, grade: 6 }),
+        body: JSON.stringify({ subject, question: finalQuestion, imageBase64Array }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setExplanation(data.explanation)
-      setQuickActions(data.quickActions || [])
     } catch {
       setExplanation('آسف، في مشكلة. حاول تاني!')
     } finally {
@@ -122,17 +134,18 @@ export default function HelpPage() {
     setStep('subject')
     setSubject(null)
     setQuestion('')
-    setImagePreview(null)
-    setImageBase64(null)
+    setImagePreviews([])
+    setImageBase64Array([])
     setExplanation('')
     setError('')
   }
 
   const selectedSubject = SUBJECTS.find(s => s.value === subject)
+  const canAddMore = imagePreviews.length < MAX_IMAGES
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-violet-50 via-blue-50 to-cyan-50 p-4" dir="rtl">
-      <div className="max-w-md mx-auto pt-2 pb-10">
+      <div className="max-w-md mx-auto pt-2 pb-28">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
@@ -179,17 +192,21 @@ export default function HelpPage() {
             </div>
 
             <h2 className="text-xl font-bold text-slate-800 mb-1">إيه اللي مش فاهمه؟ 🤷</h2>
-            <p className="text-slate-500 text-sm mb-4">اكتب أو اتكلم أو ابعت صورة من الكتاب</p>
+            <p className="text-slate-500 text-sm mb-4">اكتب أو اتكلم أو ابعت صور من الكتاب (حتى {MAX_IMAGES} صور)</p>
 
-            {/* Image preview */}
-            {imagePreview && (
-              <div className="mb-4 relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imagePreview} alt="صورة" className="w-full max-h-40 object-cover rounded-2xl shadow" />
-                <button
-                  onClick={() => { setImagePreview(null); setImageBase64(null) }}
-                  className="absolute top-2 left-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm shadow"
-                >✕</button>
+            {/* Image previews grid */}
+            {imagePreviews.length > 0 && (
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                {imagePreviews.map((preview, i) => (
+                  <div key={i} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={preview} alt={`صورة ${i + 1}`} className="w-full h-20 object-cover rounded-xl shadow-sm" />
+                    <button
+                      onClick={() => removeImage(i)}
+                      className="absolute top-1 left-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow"
+                    >✕</button>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -205,9 +222,26 @@ export default function HelpPage() {
               <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 bg-slate-50">
                 <div className="flex gap-2">
                   {/* Camera */}
-                  <button onClick={() => cameraRef.current?.click()} className="p-2 rounded-xl bg-white border border-slate-200 text-lg hover:bg-slate-50 transition-all" title="التقط صورة">📷</button>
+                  {canAddMore && (
+                    <button
+                      onClick={() => cameraRef.current?.click()}
+                      className="p-2 rounded-xl bg-white border border-slate-200 text-lg hover:bg-slate-50 transition-all"
+                      title="التقط صورة"
+                    >📷</button>
+                  )}
                   {/* Gallery */}
-                  <button onClick={() => galleryRef.current?.click()} className="p-2 rounded-xl bg-white border border-slate-200 text-lg hover:bg-slate-50 transition-all" title="اختر من المعرض">🖼️</button>
+                  {canAddMore && (
+                    <button
+                      onClick={() => galleryRef.current?.click()}
+                      className="p-2 rounded-xl bg-white border border-slate-200 text-lg hover:bg-slate-50 transition-all"
+                      title="اختر من المعرض"
+                    >🖼️</button>
+                  )}
+                  {imagePreviews.length > 0 && (
+                    <span className="text-xs text-blue-600 font-medium self-center">
+                      {imagePreviews.length}/{MAX_IMAGES} صور
+                    </span>
+                  )}
                 </div>
                 {/* Mic */}
                 <button
@@ -230,33 +264,31 @@ export default function HelpPage() {
 
             {error && <p className="text-red-500 text-sm text-center mb-3">{error}</p>}
 
-            {/* Quick Actions */}
-            <div className="mb-4">
-              <p className="text-xs text-slate-400 mb-2 font-medium">أو اختار سؤال سريع:</p>
-              <div className="flex flex-wrap gap-2">
-                {(QUICK_ACTIONS[subject!] || []).map((action, i) => (
-                  <button
-                    key={i}
-                    onClick={() => { setQuestion(action); askAI(action) }}
-                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 hover:border-blue-300 hover:bg-blue-50 transition-all"
-                  >
-                    {action}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <button
               onClick={() => askAI()}
-              disabled={!question.trim() && !imageBase64}
+              disabled={!question.trim() && imageBase64Array.length === 0}
               className="w-full py-4 bg-gradient-to-r from-violet-500 to-blue-600 disabled:from-slate-300 disabled:to-slate-400 text-white text-lg font-bold rounded-2xl shadow-lg active:scale-95 transition-all"
             >
               🤖 اشرحلي!
             </button>
 
             {/* Hidden inputs */}
-            <input ref={cameraRef}  type="file" accept="image/*" capture="environment" onChange={e => e.target.files?.[0] && handleImageFile(e.target.files[0])} className="hidden" />
-            <input ref={galleryRef} type="file" accept="image/*" onChange={e => e.target.files?.[0] && handleImageFile(e.target.files[0])} className="hidden" />
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={e => { if (e.target.files?.[0]) handleImageFiles([e.target.files[0]]); e.target.value = '' }}
+              className="hidden"
+            />
+            <input
+              ref={galleryRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={e => { if (e.target.files) handleImageFiles(Array.from(e.target.files)); e.target.value = '' }}
+              className="hidden"
+            />
           </div>
         )}
 
@@ -272,9 +304,13 @@ export default function HelpPage() {
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
               <p className="text-xs text-slate-400 mb-1">سؤالك هو</p>
               <p className="text-sm text-slate-700 font-medium">{question}</p>
-              {imagePreview && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={imagePreview} alt="صورة" className="mt-2 max-h-24 rounded-xl object-cover" />
+              {imagePreviews.length > 0 && (
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  {imagePreviews.map((preview, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={i} src={preview} alt={`صورة ${i + 1}`} className="h-16 rounded-xl object-cover shadow-sm" />
+                  ))}
+                </div>
               )}
             </div>
 
@@ -295,23 +331,6 @@ export default function HelpPage() {
             </div>
 
             {/* Quick follow-up actions */}
-            {!loading && quickActions.length > 0 && (
-              <div className="mb-5">
-                <p className="text-xs text-slate-400 mb-2 font-medium">أسئلة تانية ممكن تسألها:</p>
-                <div className="flex flex-wrap gap-2">
-                  {quickActions.map((action, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { setQuestion(action); askAI(action) }}
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 hover:border-violet-300 hover:bg-violet-50 transition-all"
-                    >
-                      {action}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {!loading && (
               <div className="space-y-3">
                 <button
@@ -331,20 +350,10 @@ export default function HelpPage() {
           </div>
         )}
 
-      </div>
+      </div>{/* end max-w-md */}
+
+      <BottomNav />
     </main>
   )
 }
 
-// Quick actions per subject (also used server-side but duplicated here for instant UX)
-const QUICK_ACTIONS: Record<Subject, string[]> = {
-  arabic:         ['اشرحلي القاعدة بمثال', 'الفرق بين كلمتين', 'أعرب الجملة دي', 'صحح الغلطة الإملائية'],
-  math:           ['احل المسألة دي خطوة خطوة', 'اشرحلي القانون', 'ديني مثال أسهل', 'إيه الفرق بين العمليتين؟'],
-  science:        ['اشرح بمثال من الحياة', 'ليه بيحصل ده؟', 'إيه الفرق بين المفهومين؟', 'لخصلي الدرس'],
-  english:        ['Explain in simple Arabic', 'Give me examples', 'What does this word mean?', 'Fix my sentence'],
-  social_studies: ['فين ده على الخريطة؟', 'ليه حصل ده؟', 'امتى كان ده؟', 'اشرح على شكل قصة'],
-  religion:       ['اشرحلي معنى الآية', 'إيه حكم المسألة دي؟', 'ديني مثال', 'لخصلي الدرس'],
-  computer:       ['اشرح بمثال عملي', 'إيه الفرق بين المصطلحين؟', 'إزاي التقنية دي بتشتغل؟', 'ديني تمرين'],
-  art:            ['اشرحلي التقنية دي', 'إزاي أرسم ده؟', 'إيه الألوان المناسبة؟', 'ديني فكرة مشروع'],
-  other:          ['اشرح بطريقة أبسط', 'ديني مثال', 'لخصلي الفكرة', 'إزاي أحفظ ده؟'],
-}

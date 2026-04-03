@@ -11,13 +11,20 @@ const RequestSchema = z.object({
   subject: z.string(),
   description: z.string(),
   grade: z.number(),
+  imageUrls: z.array(z.string().url()).optional(),
+  // legacy single-image field
   imageUrl: z.string().url().optional(),
 })
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { sessionId, subject, description, grade, imageUrl } = RequestSchema.parse(body)
+    const { sessionId, subject, description, grade, imageUrls, imageUrl } = RequestSchema.parse(body)
+
+    // Merge image sources
+    const allImageUrls: string[] = imageUrls && imageUrls.length > 0
+      ? imageUrls
+      : imageUrl ? [imageUrl] : []
 
     const supabase = await createServerClient()
     const prompt = buildGenerateQuestionsPrompt(subject as Subject, description, grade)
@@ -26,14 +33,15 @@ export async function POST(req: NextRequest) {
       { role: 'system', content: prompt.system },
     ]
 
-    if (imageUrl) {
-      messages.push({
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt.user },
-          { type: 'image_url', image_url: { url: imageUrl } },
-        ],
-      })
+    if (allImageUrls.length > 0) {
+      const contentParts: Parameters<typeof openai.chat.completions.create>[0]['messages'][number]['content'] = [
+        { type: 'text', text: prompt.user },
+        ...allImageUrls.map(url => ({
+          type: 'image_url' as const,
+          image_url: { url },
+        })),
+      ]
+      messages.push({ role: 'user', content: contentParts })
     } else {
       messages.push({ role: 'user', content: prompt.user })
     }

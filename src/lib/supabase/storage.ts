@@ -16,3 +16,11 @@ export async function uploadStudyImage(file: File, userId: string): Promise<stri
   const { data } = supabase.storage.from('study-images').getPublicUrl(path)
   return data.publicUrl
 }
+
+export async function uploadStudyImages(files: File[], userId: string): Promise<string[]> {
+  return Promise.all(files.map((file, i) => {
+    const timestamp = Date.now() + i
+    const fileWithTimestamp = new File([file], `${timestamp}.${file.name.split('.').pop()}`, { type: file.type })
+    return uploadStudyImage(fileWithTimestamp, userId)
+  }))
+}

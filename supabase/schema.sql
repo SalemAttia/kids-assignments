@@ -9,7 +9,7 @@ CREATE TABLE users (
   last_active DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-INSERT INTO users (name, grade) VALUES ('أحمد', 9), ('محمود', 6);
+INSERT INTO users (name, grade) VALUES ('أحمد', 8), ('محمود', 6);
 
 CREATE TABLE study_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -69,6 +69,32 @@ CREATE TABLE weekly_summaries (
 );
 
 ALTER TABLE study_sessions ADD COLUMN IF NOT EXISTS duration_minutes INT NOT NULL DEFAULT 0;
+
+-- Daily prayer tracking (5 Islamic prayers per day)
+CREATE TABLE IF NOT EXISTS prayer_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  prayer_date DATE NOT NULL,
+  fajr BOOLEAN NOT NULL DEFAULT FALSE,
+  dhuhr BOOLEAN NOT NULL DEFAULT FALSE,
+  asr BOOLEAN NOT NULL DEFAULT FALSE,
+  maghrib BOOLEAN NOT NULL DEFAULT FALSE,
+  isha BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, prayer_date)
+);
+CREATE INDEX IF NOT EXISTS idx_prayer_logs_user_date ON prayer_logs(user_id, prayer_date DESC);
+
+-- Weekly study schedule (which subjects on which days)
+CREATE TABLE IF NOT EXISTS study_schedule (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Sun … 6=Sat
+  subject TEXT NOT NULL,
+  order_index SMALLINT NOT NULL DEFAULT 0,
+  UNIQUE (user_id, day_of_week, subject)
+);
+CREATE INDEX IF NOT EXISTS idx_study_schedule_user ON study_schedule(user_id, day_of_week);
 
 -- Storage: create bucket and open RLS policies (app uses custom auth, not Supabase Auth)
 INSERT INTO storage.buckets (id, name, public)

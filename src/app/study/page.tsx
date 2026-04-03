@@ -3,9 +3,10 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useStudySession } from '@/hooks/useStudySession'
-import { uploadStudyImage } from '@/lib/supabase/storage'
+import { uploadStudyImages } from '@/lib/supabase/storage'
 import { type Subject } from '@/types'
 import { useEffect } from 'react'
+import BottomNav from '@/components/BottomNav'
 
 const SUBJECTS: { value: Subject; label: string; emoji: string; color: string; bg: string }[] = [
   { value: 'arabic',        label: 'اللغة العربية',      emoji: '📖', color: 'from-purple-500 to-purple-600',  bg: 'bg-purple-50 border-purple-300' },
@@ -14,9 +15,6 @@ const SUBJECTS: { value: Subject; label: string; emoji: string; color: string; b
   { value: 'english',       label: 'اللغة الإنجليزية',   emoji: '💬', color: 'from-yellow-500 to-orange-500',  bg: 'bg-yellow-50 border-yellow-300' },
   { value: 'social_studies',label: 'الدراسات الاجتماعية',emoji: '🌍', color: 'from-orange-500 to-red-500',     bg: 'bg-orange-50 border-orange-300' },
   { value: 'religion',      label: 'التربية الدينية',     emoji: '🌙', color: 'from-teal-500 to-cyan-600',      bg: 'bg-teal-50 border-teal-300' },
-  { value: 'computer',      label: 'الحاسب الآلي',        emoji: '💻', color: 'from-indigo-500 to-indigo-600',  bg: 'bg-indigo-50 border-indigo-300' },
-  { value: 'art',           label: 'التربية الفنية',      emoji: '🎨', color: 'from-pink-500 to-rose-500',      bg: 'bg-pink-50 border-pink-300' },
-  { value: 'other',         label: 'أخرى',                emoji: '⭐', color: 'from-slate-500 to-slate-600',    bg: 'bg-slate-50 border-slate-300' },
 ]
 
 const HINTS = [
@@ -27,6 +25,8 @@ const HINTS = [
   'في حاجة مش فاهمها تماماً؟',
 ]
 
+const MAX_IMAGES = 5
+
 export default function StudyPage() {
   const router = useRouter()
   const { userId, loaded } = useCurrentUser()
@@ -35,14 +35,12 @@ export default function StudyPage() {
   const [step, setStep] = useState(1)
   const [subject, setSubject] = useState<Subject | null>(null)
   const [description, setDescription] = useState('')
-  const [image, setImage] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [images, setImages] = useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [listening, setListening] = useState(false)
   const [hintIndex, setHintIndex] = useState(0)
-  // `SpeechRecognition` isn't available in standard TS DOM typings everywhere.
-  // Loosen the typing so `next build` doesn't fail during type-checking.
   const recognitionRef = useRef<any>(null)
   const shouldListenRef = useRef(false)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -62,14 +60,12 @@ export default function StudyPage() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SR || !shouldListenRef.current) return
 
-    // Always create a fresh instance — restarting the same object is unreliable in Chrome
     const rec = new SR()
-    rec.lang = 'ar'           // broader Arabic dialect support vs ar-SA
-    rec.continuous = false    // let it end naturally; we restart in onend
-    rec.interimResults = true // stream partial results as the user speaks
+    rec.lang = 'ar'
+    rec.continuous = false
+    rec.interimResults = true
 
     rec.onresult = (e: any) => {
-      // Only append final segments to avoid duplicate interim text
       let finalText = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (e.results[i].isFinal) finalText += e.results[i][0].transcript
@@ -78,13 +74,12 @@ export default function StudyPage() {
     }
 
     rec.onend = () => {
-      // Spin up a fresh instance immediately if user hasn't stopped
       if (shouldListenRef.current) startRecognition()
       else setListening(false)
     }
 
     rec.onerror = (e: any) => {
-      if (e.error === 'no-speech') return // silence — onend will restart
+      if (e.error === 'no-speech') return
       shouldListenRef.current = false
       setListening(false)
       if (e.error === 'not-allowed') {
@@ -112,13 +107,26 @@ export default function StudyPage() {
     startRecognition()
   }
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 5 * 1024 * 1024) { setError('حجم الصورة لازم يكون أقل من 5 ميجابايت'); return }
-    setImage(file)
-    setImagePreview(URL.createObjectURL(file))
+  function handleImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
+
+    const remaining = MAX_IMAGES - images.length
+    const toAdd = files.slice(0, remaining)
+
+    const oversized = toAdd.filter(f => f.size > 5 * 1024 * 1024)
+    if (oversized.length > 0) { setError('حجم كل صورة لازم يكون أقل من 5 ميجابايت'); return }
+
+    setImages(prev => [...prev, ...toAdd])
+    setImagePreviews(prev => [...prev, ...toAdd.map(f => URL.createObjectURL(f))])
     setError('')
+    // Reset input so same file can be re-selected
+    e.target.value = ''
+  }
+
+  function removeImage(index: number) {
+    setImages(prev => prev.filter((_, i) => i !== index))
+    setImagePreviews(prev => prev.filter((_, i) => i !== index))
   }
 
   async function handleSubmit() {
@@ -129,13 +137,21 @@ export default function StudyPage() {
     setError('')
 
     try {
-      let imageUrl: string | undefined
-      if (image && userId) imageUrl = await uploadStudyImage(image, userId)
+      let imageUrls: string[] | undefined
+      if (images.length > 0 && userId) {
+        imageUrls = await uploadStudyImages(images, userId)
+      }
 
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, subject, description, imageUrl, durationMinutes: Math.round((Date.now() - startTimeRef.current) / 60000) }),
+        body: JSON.stringify({
+          userId,
+          subject,
+          description,
+          imageUrls,
+          durationMinutes: Math.round((Date.now() - startTimeRef.current) / 60000),
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'في مشكلة')
@@ -150,10 +166,11 @@ export default function StudyPage() {
   }
 
   const selectedSubject = SUBJECTS.find(s => s.value === subject)
+  const canAddMore = images.length < MAX_IMAGES
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4" dir="rtl">
-      <div className="max-w-xl mx-auto">
+      <div className="max-w-xl mx-auto pb-28">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6 pt-2">
@@ -208,7 +225,6 @@ export default function StudyPage() {
         {/* Step 2 — Description */}
         {step === 2 && selectedSubject && (
           <div className="animate-fade-in">
-            {/* Subject badge */}
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r ${selectedSubject.color} text-white text-sm font-bold mb-6 shadow`}>
               <span>{selectedSubject.emoji}</span>
               <span>{selectedSubject.label}</span>
@@ -275,53 +291,84 @@ export default function StudyPage() {
           </div>
         )}
 
-        {/* Step 3 — Photo + Submit */}
+        {/* Step 3 — Photos + Submit */}
         {step === 3 && (
           <div className="animate-fade-in">
             <div className="text-center mb-6">
               <div className="text-5xl mb-3">📷</div>
-              <h1 className="text-2xl font-bold text-slate-800">ضيف صورة (اختياري)</h1>
-              <p className="text-slate-500 text-sm mt-1">صورة من الكتاب أو الدفتر بتساعدنا نسألك أسئلة أحسن!</p>
+              <h1 className="text-2xl font-bold text-slate-800">ضيف صور (اختياري)</h1>
+              <p className="text-slate-500 text-sm mt-1">
+                صور من الكتاب أو الدفتر بتساعدنا نسألك أسئلة أحسن! (حتى {MAX_IMAGES} صور)
+              </p>
             </div>
 
-            {/* Hidden inputs */}
-            <input ref={cameraInputRef}  type="file" accept="image/*" capture="environment" onChange={handleImageChange} className="hidden" />
-            <input ref={galleryInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+            {/* Hidden inputs — allow multiple files */}
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleImagesChange}
+              className="hidden"
+            />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImagesChange}
+              className="hidden"
+            />
 
-            {/* Image preview */}
-            {imagePreview ? (
-              <div className="mb-6 text-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imagePreview} alt="معاينة" className="max-h-52 mx-auto rounded-2xl shadow-md" />
-                <button
-                  type="button"
-                  onClick={() => { setImage(null); setImagePreview(null) }}
-                  className="mt-3 text-sm text-red-400 hover:text-red-600 font-medium"
-                >
-                  🗑 شيل الصورة
-                </button>
+            {/* Image previews grid */}
+            {imagePreviews.length > 0 && (
+              <div className="mb-4 grid grid-cols-3 gap-2">
+                {imagePreviews.map((preview, i) => (
+                  <div key={i} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={preview}
+                      alt={`صورة ${i + 1}`}
+                      className="w-full h-24 object-cover rounded-xl shadow-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(i)}
+                      className="absolute top-1 left-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4 mb-6">
+            )}
+
+            {/* Add more / first upload buttons */}
+            {canAddMore && (
+              <div className={`grid gap-4 mb-6 ${imagePreviews.length === 0 ? 'grid-cols-2' : 'grid-cols-2'}`}>
                 <button
                   type="button"
                   onClick={() => cameraInputRef.current?.click()}
-                  className="flex flex-col items-center gap-3 p-6 bg-white rounded-2xl border-2 border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-md active:scale-95 transition-all"
+                  className="flex flex-col items-center gap-3 p-5 bg-white rounded-2xl border-2 border-slate-100 shadow-sm hover:border-blue-300 hover:shadow-md active:scale-95 transition-all"
                 >
-                  <span className="text-5xl">📷</span>
+                  <span className="text-4xl">📷</span>
                   <span className="text-sm font-bold text-slate-700">التقط صورة</span>
-                  <span className="text-xs text-slate-400">افتح الكاميرا</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => galleryInputRef.current?.click()}
-                  className="flex flex-col items-center gap-3 p-6 bg-white rounded-2xl border-2 border-slate-100 shadow-sm hover:border-purple-300 hover:shadow-md active:scale-95 transition-all"
+                  className="flex flex-col items-center gap-3 p-5 bg-white rounded-2xl border-2 border-slate-100 shadow-sm hover:border-purple-300 hover:shadow-md active:scale-95 transition-all"
                 >
-                  <span className="text-5xl">🖼️</span>
+                  <span className="text-4xl">🖼️</span>
                   <span className="text-sm font-bold text-slate-700">من المعرض</span>
-                  <span className="text-xs text-slate-400">اختار صورة موجودة</span>
                 </button>
               </div>
+            )}
+
+            {images.length >= MAX_IMAGES && (
+              <p className="text-center text-amber-600 text-sm mb-4 font-medium">
+                وصلت للحد الأقصى ({MAX_IMAGES} صور)
+              </p>
             )}
 
             {/* Summary card */}
@@ -330,6 +377,11 @@ export default function StudyPage() {
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">{selectedSubject?.emoji}</span>
                 <span className="font-bold text-slate-700">{selectedSubject?.label}</span>
+                {images.length > 0 && (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                    {images.length} صورة
+                  </span>
+                )}
               </div>
               <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">{description}</p>
             </div>
@@ -349,11 +401,13 @@ export default function StudyPage() {
               {loading ? '⏳ بيتم الحفظ...' : '🚀 ابدأ الأسئلة!'}
             </button>
 
-            <p className="text-center text-slate-400 text-xs mt-3">تقدر تعدي إضافة الصورة وتبدأ على طول</p>
+            <p className="text-center text-slate-400 text-xs mt-3">تقدر تعدي إضافة الصور وتبدأ على طول</p>
           </div>
         )}
 
       </div>
+
+      <BottomNav />
     </main>
   )
 }
