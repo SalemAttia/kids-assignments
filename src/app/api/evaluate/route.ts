@@ -107,7 +107,10 @@ export async function POST(req: NextRequest) {
       .select()
       .single()
 
-    if (reportError) console.error('Report insert error:', reportError)
+    if (reportError) {
+      console.error('Report insert error:', reportError)
+      throw new Error(`Report save failed: ${reportError.message}`)
+    }
 
     // Update user points + streak
     const user = session.users
