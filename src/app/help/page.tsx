@@ -11,9 +11,6 @@ const SUBJECTS: { value: Subject; emoji: string; label: string; color: string }[
   { value: 'english',        emoji: '💬', label: 'اللغة الإنجليزية',    color: 'from-yellow-500 to-orange-500' },
   { value: 'social_studies', emoji: '🌍', label: 'الدراسات الاجتماعية', color: 'from-orange-500 to-red-500' },
   { value: 'religion',       emoji: '🌙', label: 'التربية الدينية',      color: 'from-teal-500 to-cyan-600' },
-  { value: 'computer',       emoji: '💻', label: 'الحاسب الآلي',         color: 'from-indigo-500 to-indigo-600' },
-  { value: 'art',            emoji: '🎨', label: 'التربية الفنية',       color: 'from-pink-500 to-rose-500' },
-  { value: 'other',          emoji: '⭐', label: 'أخرى',                 color: 'from-slate-500 to-slate-600' },
 ]
 
 type Step = 'subject' | 'question' | 'result'

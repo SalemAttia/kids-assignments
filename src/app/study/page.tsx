@@ -14,9 +14,6 @@ const SUBJECTS: { value: Subject; label: string; emoji: string; color: string; b
   { value: 'english',       label: 'اللغة الإنجليزية',   emoji: '💬', color: 'from-yellow-500 to-orange-500',  bg: 'bg-yellow-50 border-yellow-300' },
   { value: 'social_studies',label: 'الدراسات الاجتماعية',emoji: '🌍', color: 'from-orange-500 to-red-500',     bg: 'bg-orange-50 border-orange-300' },
   { value: 'religion',      label: 'التربية الدينية',     emoji: '🌙', color: 'from-teal-500 to-cyan-600',      bg: 'bg-teal-50 border-teal-300' },
-  { value: 'computer',      label: 'الحاسب الآلي',        emoji: '💻', color: 'from-indigo-500 to-indigo-600',  bg: 'bg-indigo-50 border-indigo-300' },
-  { value: 'art',           label: 'التربية الفنية',      emoji: '🎨', color: 'from-pink-500 to-rose-500',      bg: 'bg-pink-50 border-pink-300' },
-  { value: 'other',         label: 'أخرى',                emoji: '⭐', color: 'from-slate-500 to-slate-600',    bg: 'bg-slate-50 border-slate-300' },
 ]
 
 const HINTS = [
