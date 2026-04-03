@@ -102,10 +102,19 @@ export async function POST(req: NextRequest) {
         feedback: evaluation.feedback,
         mistakes: evaluation.mistakes,
         suggestions: evaluation.suggestions,
-        all_answers_review: allAnswersReview,
       })
       .select()
       .single()
+
+    // Best-effort: store full Q&A review (requires DB migration to add all_answers_review column)
+    if (report?.id) {
+      supabase
+        .from('reports')
+        .update({ all_answers_review: allAnswersReview })
+        .eq('id', report.id)
+        .then(() => {})
+        .catch(() => {})
+    }
 
     // Update user points + streak
     const user = session.users

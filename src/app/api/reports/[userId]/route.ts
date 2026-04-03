@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
   const { data, error } = await supabase
     .from('study_sessions')
     .select(`
-      id, subject, description, created_at,
+      id, subject, description, duration_minutes, created_at,
       reports(id, total_score, feedback, mistakes, suggestions, created_at)
     `)
     .eq('user_id', userId)
