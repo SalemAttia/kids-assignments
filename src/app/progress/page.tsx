@@ -54,15 +54,15 @@ export default function ProgressPage() {
     if (loaded && !userId) { router.replace('/'); return }
     if (userId) {
       Promise.all([
-        fetch(`/api/reports/${userId}`).then(r => r.json()),
-        fetch(`/api/daily-stats/${userId}`).then(r => r.json()),
-        fetch(`/api/help-sessions/${userId}`).then(r => r.json()),
+        fetch(`/api/reports/${userId}`).then(r => r.json()).catch(() => ({})),
+        fetch(`/api/daily-stats/${userId}`).then(r => r.json()).catch(() => ({})),
+        fetch(`/api/help-sessions/${userId}`).then(r => r.json()).catch(() => ({})),
       ]).then(([reports, stats, help]) => {
         setSessions(reports.sessions || [])
         setUserName(stats.user?.name || '')
         setHelpSessions(help.sessions || [])
         setLoading(false)
-      }).catch(() => setLoading(false))
+      })
     }
   }, [loaded, userId, router])
 
