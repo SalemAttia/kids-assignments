@@ -41,6 +41,17 @@ export default function QuizPage() {
 
       if (!session) { router.replace('/study'); return }
 
+      // image_url may be a single URL or a JSON-encoded array of URLs
+      let imageUrls: string[] | undefined
+      if (session.image_url) {
+        try {
+          const parsed = JSON.parse(session.image_url)
+          imageUrls = Array.isArray(parsed) ? parsed : [session.image_url]
+        } catch {
+          imageUrls = [session.image_url]
+        }
+      }
+
       const res = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -49,7 +60,7 @@ export default function QuizPage() {
           subject: session.subject,
           description: session.description,
           grade: (session.users as unknown as {grade: number}).grade,
-          imageUrl: session.image_url || undefined,
+          imageUrls,
         }),
       })
       const data = await res.json()
