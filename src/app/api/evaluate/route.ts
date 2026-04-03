@@ -93,26 +93,21 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    // Insert report
-    const { data: report } = await supabase
+    // Insert report (upsert to handle retakes of the same session)
+    const { data: report, error: reportError } = await supabase
       .from('reports')
-      .insert({
+      .upsert({
         session_id: sessionId,
         total_score: evaluation.total_score,
         feedback: evaluation.feedback,
         mistakes: evaluation.mistakes,
         suggestions: evaluation.suggestions,
-      })
+        all_answers_review: allAnswersReview,
+      }, { onConflict: 'session_id' })
       .select()
       .single()
 
-    // Best-effort: store full Q&A review (requires DB migration to add all_answers_review column)
-    if (report?.id) {
-      void supabase
-        .from('reports')
-        .update({ all_answers_review: allAnswersReview })
-        .eq('id', report.id)
-    }
+    if (reportError) console.error('Report insert error:', reportError)
 
     // Update user points + streak
     const user = session.users
