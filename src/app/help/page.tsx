@@ -385,6 +385,8 @@ export default function HelpPage() {
           </div>
         )}
 
+      </div>{/* end max-w-md */}
+
       <BottomNav />
     </main>
   )
