@@ -20,7 +20,7 @@ export default function ParentPage() {
       sessionStorage.setItem('parentAuth', 'true')
       router.push('/parent/dashboard')
     } else {
-      setError('اسم المستخدم أو كلمة المرور غير صحيحة')
+      setError('اسم المستخدم أو كلمة المرور مش صح')
     }
   }
 
@@ -28,7 +28,7 @@ export default function ParentPage() {
     <main className="flex items-center justify-center min-h-screen bg-slate-50 p-6">
       <div className="bg-white rounded-2xl p-8 shadow-md border border-slate-100 w-full max-w-sm">
         <h1 className="text-2xl font-bold text-blue-800 mb-2">لوحة ولي الأمر</h1>
-        <p className="text-slate-500 mb-6">يرجى تسجيل الدخول للمتابعة</p>
+        <p className="text-slate-500 mb-6">من فضلك سجل دخولك عشان تكمل</p>
         <form onSubmit={handleLogin} className="space-y-4">
           <input
             value={username}
@@ -55,7 +55,7 @@ export default function ParentPage() {
           onClick={() => router.push('/')}
           className="mt-4 w-full text-center text-sm text-slate-400 hover:text-slate-600"
         >
-          العودة للصفحة الرئيسية
+          ارجع للصفحة الرئيسية
         </button>
       </div>
     </main>

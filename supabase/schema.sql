@@ -9,7 +9,7 @@ CREATE TABLE users (
   last_active DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-INSERT INTO users (name, grade) VALUES ('أحمد', 6), ('محمود', 9);
+INSERT INTO users (name, grade) VALUES ('أحمد', 9), ('محمود', 6);
 
 CREATE TABLE study_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -67,6 +67,8 @@ CREATE TABLE weekly_summaries (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, week_start)
 );
+
+ALTER TABLE study_sessions ADD COLUMN IF NOT EXISTS duration_minutes INT NOT NULL DEFAULT 0;
 
 -- Storage: create bucket and open RLS policies (app uses custom auth, not Supabase Auth)
 INSERT INTO storage.buckets (id, name, public)

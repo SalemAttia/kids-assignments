@@ -8,7 +8,8 @@ export function buildGenerateQuestionsPrompt(
   const subjectLabel = SUBJECT_LABELS[subject]
   return {
     system: `أنت مساعد تعليمي متخصص في تصميم أسئلة للطلاب المصريين.
-مهمتك: توليد أسئلة دراسية باللغة العربية بناءً على ما يدرسه الطالب.
+مهمتك: توليد أسئلة دراسية بناءً على ما يدرسه الطالب.
+اكتب الأسئلة بالعامية المصرية (مش فصحى).
 أجب دائماً بـ JSON فقط، بدون أي نص إضافي.`,
     user: `الطالب في الصف: ${grade}
 المادة: ${subjectLabel}
@@ -53,7 +54,7 @@ export function buildEvaluateAnswersPrompt(
   const subjectLabel = SUBJECT_LABELS[subject]
   return {
     system: `أنت مصحح اختبارات تعليمي متخصص بالمناهج المصرية.
-قيّم إجابات الطالب بموضوعية ودقة، وقدم تغذية راجعة تشجيعية باللغة العربية.
+قيّم إجابات الطالب بموضوعية ودقة، وقدم تغذية راجعة تشجيعية بالعامية المصرية (مش فصحى).
 أجب دائماً بـ JSON فقط.`,
     user: `الطالب في الصف: ${grade}
 المادة: ${subjectLabel}
@@ -103,7 +104,7 @@ export function buildWeeklySummaryPrompt(params: {
 }) {
   return {
     system: `أنت مستشار تعليمي يقدم تقارير أسبوعية للوالدين عن تقدم أبنائهم الدراسي.
-اكتب بأسلوب احترافي ومشجع باللغة العربية.
+اكتب بأسلوب احترافي ومشجع بالعامية المصرية.
 أجب دائماً بـ JSON فقط.`,
     user: `اسم الطالب: ${params.studentName}
 الصف: ${params.grade}

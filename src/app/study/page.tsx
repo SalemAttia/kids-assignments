@@ -20,11 +20,11 @@ const SUBJECTS: { value: Subject; label: string; emoji: string; color: string; b
 ]
 
 const HINTS = [
-  'ماذا كان الموضوع الرئيسي؟',
-  'ما الذي فهمته جيداً؟',
-  'هل تعلمت قاعدة أو معادلة جديدة؟',
-  'ما الأمثلة التي شرحها المعلم؟',
-  'هل هناك شيء لم تفهمه تماماً؟',
+  'إيه كان الموضوع الأساسي؟',
+  'إيه اللي فهمته كويس؟',
+  'اتعلمت قاعدة أو معادلة جديدة؟',
+  'إيه الأمثلة اللي شرحها المدرس؟',
+  'في حاجة مش فاهمها تماماً؟',
 ]
 
 export default function StudyPage() {
@@ -41,10 +41,13 @@ export default function StudyPage() {
   const [error, setError] = useState('')
   const [listening, setListening] = useState(false)
   const [hintIndex, setHintIndex] = useState(0)
-  const recognitionRef = useRef<InstanceType<typeof window.SpeechRecognition> | null>(null)
+  // `SpeechRecognition` isn't available in standard TS DOM typings everywhere.
+  // Loosen the typing so `next build` doesn't fail during type-checking.
+  const recognitionRef = useRef<any>(null)
   const shouldListenRef = useRef(false)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
+  const startTimeRef = useRef<number>(Date.now())
 
   useEffect(() => {
     if (loaded && !userId) router.replace('/')
@@ -56,9 +59,7 @@ export default function StudyPage() {
   }, [])
 
   function startRecognition() {
-    const SR =
-      (window as typeof window & { SpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition ||
-      (window as typeof window & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SR || !shouldListenRef.current) return
 
     // Always create a fresh instance — restarting the same object is unreliable in Chrome
@@ -67,7 +68,7 @@ export default function StudyPage() {
     rec.continuous = false    // let it end naturally; we restart in onend
     rec.interimResults = true // stream partial results as the user speaks
 
-    rec.onresult = (e: SpeechRecognitionEvent) => {
+    rec.onresult = (e: any) => {
       // Only append final segments to avoid duplicate interim text
       let finalText = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -82,12 +83,12 @@ export default function StudyPage() {
       else setListening(false)
     }
 
-    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
+    rec.onerror = (e: any) => {
       if (e.error === 'no-speech') return // silence — onend will restart
       shouldListenRef.current = false
       setListening(false)
       if (e.error === 'not-allowed') {
-        setError('🎤 يرجى السماح بالوصول للميكروفون من إعدادات المتصفح')
+        setError('🎤 اسمح للميكروفون من إعدادات المتصفح')
       }
     }
 
@@ -96,10 +97,8 @@ export default function StudyPage() {
   }
 
   function toggleVoice() {
-    const SR =
-      (window as typeof window & { SpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition ||
-      (window as typeof window & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition
-    if (!SR) { setError('المتصفح لا يدعم التعرف على الصوت'); return }
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SR) { setError('المتصفح ده مش بيدعم التعرف على الصوت'); return }
 
     if (shouldListenRef.current) {
       shouldListenRef.current = false
@@ -116,7 +115,7 @@ export default function StudyPage() {
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { setError('حجم الصورة يجب أن يكون أقل من 5 ميجابايت'); return }
+    if (file.size > 5 * 1024 * 1024) { setError('حجم الصورة لازم يكون أقل من 5 ميجابايت'); return }
     setImage(file)
     setImagePreview(URL.createObjectURL(file))
     setError('')
@@ -124,7 +123,7 @@ export default function StudyPage() {
 
   async function handleSubmit() {
     if (!subject) return
-    if (description.trim().length < 10) { setError('اكتب أكثر قليلاً! (10 أحرف على الأقل) ✏️'); return }
+    if (description.trim().length < 10) { setError('اكتب أكتر شوية! (10 أحرف على الأقل) ✏️'); return }
 
     setLoading(true)
     setError('')
@@ -136,15 +135,15 @@ export default function StudyPage() {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, subject, description, imageUrl }),
+        body: JSON.stringify({ userId, subject, description, imageUrl, durationMinutes: Math.round((Date.now() - startTimeRef.current) / 60000) }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'حدث خطأ')
+      if (!res.ok) throw new Error(data.error || 'في مشكلة')
 
       setSessionId(data.sessionId)
       router.push('/quiz')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'حدث خطأ غير متوقع')
+      setError(err instanceof Error ? err.message : 'في مشكلة مش متوقعة')
     } finally {
       setLoading(false)
     }
@@ -184,8 +183,8 @@ export default function StudyPage() {
           <div className="animate-fade-in">
             <div className="text-center mb-8">
               <div className="text-5xl mb-3">📚</div>
-              <h1 className="text-2xl font-bold text-slate-800">ماذا درست اليوم؟</h1>
-              <p className="text-slate-500 mt-1">اختر المادة التي درستها</p>
+              <h1 className="text-2xl font-bold text-slate-800">إيه اللي ذاكرته النهارده؟</h1>
+              <p className="text-slate-500 mt-1">اختار المادة اللي ذاكرتها</p>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
@@ -215,8 +214,8 @@ export default function StudyPage() {
               <span>{selectedSubject.label}</span>
             </div>
 
-            <h1 className="text-2xl font-bold text-slate-800 mb-1">أخبرنا ماذا تعلمت! 🧠</h1>
-            <p className="text-slate-500 text-sm mb-5">كلما كتبت أكثر، كانت الأسئلة أدق وأفضل!</p>
+            <h1 className="text-2xl font-bold text-slate-800 mb-1">قولنا اتعلمت إيه! 🧠</h1>
+            <p className="text-slate-500 text-sm mb-5">كل ما كتبت أكتر، الأسئلة بتبقى أدق وأحسن!</p>
 
             {/* Hint carousel */}
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 mb-4 flex items-center gap-3">
@@ -229,7 +228,7 @@ export default function StudyPage() {
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                placeholder="اكتب أو تحدث... مثال: درست اليوم الجمل الاسمية وتعلمت الفرق بين المبتدأ والخبر"
+                placeholder="اكتب أو اتكلم... مثال: ذاكرت النهارده الجمل الاسمية واتعلمت الفرق بين المبتدأ والخبر"
                 className="w-full h-44 p-4 text-slate-700 resize-none focus:outline-none text-sm leading-relaxed"
                 dir="rtl"
               />
@@ -244,7 +243,7 @@ export default function StudyPage() {
                       : 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow hover:shadow-md'
                   }`}
                 >
-                  {listening ? '⏹ إيقاف' : '🎤 تحدث'}
+                  {listening ? '⏹ إيقاف' : '🎤 اتكلم'}
                 </button>
               </div>
             </div>
@@ -252,7 +251,7 @@ export default function StudyPage() {
             {listening && (
               <div className="flex items-center gap-2 text-red-500 text-sm font-medium mb-3 justify-center">
                 <span className="w-2 h-2 bg-red-500 rounded-full animate-ping inline-block" />
-                جاري التسجيل... تحدث الآن!
+                بيتم التسجيل... اتكلم دلوقتي!
               </div>
             )}
 
@@ -265,13 +264,13 @@ export default function StudyPage() {
             <button
               type="button"
               onClick={() => {
-                if (description.trim().length < 10) { setError('اكتب أكثر قليلاً! (10 أحرف على الأقل) ✏️'); return }
+                if (description.trim().length < 10) { setError('اكتب أكتر شوية! (10 أحرف على الأقل) ✏️'); return }
                 setError('')
                 setStep(3)
               }}
               className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95"
             >
-              التالي ←
+              الجاي ←
             </button>
           </div>
         )}
@@ -281,8 +280,8 @@ export default function StudyPage() {
           <div className="animate-fade-in">
             <div className="text-center mb-6">
               <div className="text-5xl mb-3">📷</div>
-              <h1 className="text-2xl font-bold text-slate-800">أضف صورة (اختياري)</h1>
-              <p className="text-slate-500 text-sm mt-1">صورة من الكتاب أو الدفتر تساعدنا نسألك أسئلة أفضل!</p>
+              <h1 className="text-2xl font-bold text-slate-800">ضيف صورة (اختياري)</h1>
+              <p className="text-slate-500 text-sm mt-1">صورة من الكتاب أو الدفتر بتساعدنا نسألك أسئلة أحسن!</p>
             </div>
 
             {/* Hidden inputs */}
@@ -299,7 +298,7 @@ export default function StudyPage() {
                   onClick={() => { setImage(null); setImagePreview(null) }}
                   className="mt-3 text-sm text-red-400 hover:text-red-600 font-medium"
                 >
-                  🗑 إزالة الصورة
+                  🗑 شيل الصورة
                 </button>
               </div>
             ) : (
@@ -320,14 +319,14 @@ export default function StudyPage() {
                 >
                   <span className="text-5xl">🖼️</span>
                   <span className="text-sm font-bold text-slate-700">من المعرض</span>
-                  <span className="text-xs text-slate-400">اختر صورة موجودة</span>
+                  <span className="text-xs text-slate-400">اختار صورة موجودة</span>
                 </button>
               </div>
             )}
 
             {/* Summary card */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-6">
-              <p className="text-xs text-slate-400 font-medium mb-2">ملخص جلستك</p>
+              <p className="text-xs text-slate-400 font-medium mb-2">ملخص جلسة المذاكرة</p>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">{selectedSubject?.emoji}</span>
                 <span className="font-bold text-slate-700">{selectedSubject?.label}</span>
@@ -347,10 +346,10 @@ export default function StudyPage() {
               disabled={loading}
               className="w-full py-4 bg-gradient-to-r from-green-500 to-teal-500 disabled:from-slate-300 disabled:to-slate-400 text-white text-xl font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95"
             >
-              {loading ? '⏳ جاري الحفظ...' : '🚀 ابدأ الأسئلة!'}
+              {loading ? '⏳ بيتم الحفظ...' : '🚀 ابدأ الأسئلة!'}
             </button>
 
-            <p className="text-center text-slate-400 text-xs mt-3">يمكنك تخطي إضافة الصورة والبدء مباشرة</p>
+            <p className="text-center text-slate-400 text-xs mt-3">تقدر تعدي إضافة الصورة وتبدأ على طول</p>
           </div>
         )}
 

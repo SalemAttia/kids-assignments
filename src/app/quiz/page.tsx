@@ -24,7 +24,7 @@ export default function QuizPage() {
     const sessionId = getSessionId()
     if (!sessionId) { router.replace('/study'); return }
 
-    const cached = getQuestions()
+    const cached = getQuestions(sessionId)
     if (cached.length > 0) {
       setQuestionsState(cached)
       setLoading(false)
@@ -53,9 +53,9 @@ export default function QuizPage() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'فشل توليد الأسئلة'); setLoading(false); return }
+      if (!res.ok) { setError(data.error || 'في مشكلة في عمل الأسئلة'); setLoading(false); return }
 
-      setQuestions(data.questions)
+      setQuestions(data.questions, sessionId)
       setQuestionsState(data.questions)
       setLoading(false)
     }
@@ -67,12 +67,16 @@ export default function QuizPage() {
     setAnswers(prev => ({ ...prev, [questionId]: value }))
   }
 
+  function handleSkip() {
+    handleAnswer(current.id, 'مش عارف')
+    if (currentIndex < questions.length - 1) setCurrentIndex(i => i + 1)
+  }
+
   async function handleSubmit() {
-    const unanswered = questions.filter(q => !answers[q.id])
-    if (unanswered.length > 0) {
-      setError('يرجى الإجابة على جميع الأسئلة')
-      return
-    }
+    // Auto-fill skipped questions
+    const finalAnswers = { ...answers }
+    questions.forEach(q => { if (!finalAnswers[q.id]) finalAnswers[q.id] = 'مش عارف' })
+    setAnswers(finalAnswers)
 
     setSubmitting(true)
     setError('')
@@ -84,17 +88,17 @@ export default function QuizPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
-          answers: Object.entries(answers).map(([questionId, answerText]) => ({ questionId, answerText })),
+          answers: Object.entries(finalAnswers).map(([questionId, answerText]) => ({ questionId, answerText })),
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل التقييم')
+      if (!res.ok) throw new Error(data.error || 'في مشكلة في التقييم')
 
       setReportId(data.report.id)
       sessionStorage.setItem('reportData', JSON.stringify(data))
       router.push('/report')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'حدث خطأ')
+      setError(err instanceof Error ? err.message : 'في مشكلة')
     } finally {
       setSubmitting(false)
     }
@@ -103,8 +107,8 @@ export default function QuizPage() {
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-4">
       <div className="text-5xl animate-bounce">🤔</div>
-      <p className="text-xl text-blue-700 font-semibold">جاري إنشاء الأسئلة...</p>
-      <p className="text-slate-500">يرجى الانتظار لحظة</p>
+      <p className="text-xl text-blue-700 font-semibold">بيتم عمل الأسئلة...</p>
+      <p className="text-slate-500">استنى شوية</p>
     </div>
   )
 
@@ -113,7 +117,7 @@ export default function QuizPage() {
       <div className="text-5xl">❌</div>
       <p className="text-xl text-red-600">{error}</p>
       <button onClick={() => router.replace('/study')} className="px-6 py-3 bg-blue-600 text-white rounded-xl">
-        العودة للدراسة
+        ارجع للمذاكرة
       </button>
     </div>
   )
@@ -128,7 +132,19 @@ export default function QuizPage() {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-2">
             <h1 className="text-xl font-bold text-blue-800">الأسئلة</h1>
-            <span className="text-sm text-slate-500">سؤال {currentIndex + 1} من {questions.length}</span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-slate-500">سؤال {currentIndex + 1} من {questions.length}</span>
+              <button
+                onClick={() => {
+                  if (confirm('عايز تخلص الاختبار وترجع للصفحة الرئيسية؟')) {
+                    router.push('/hub')
+                  }
+                }}
+                className="text-xs text-slate-400 hover:text-red-500 bg-slate-100 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-colors"
+              >
+                ✕ خلاص
+              </button>
+            </div>
           </div>
           <div className="w-full bg-slate-200 rounded-full h-2">
             <div
@@ -176,22 +192,33 @@ export default function QuizPage() {
         )}
 
         {/* Navigation */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           {currentIndex > 0 && (
             <button
               onClick={() => setCurrentIndex(i => i - 1)}
               className="flex-1 py-3 border-2 border-slate-300 text-slate-600 rounded-xl font-semibold hover:border-slate-400"
             >
-              → السابق
+              → الفات
             </button>
           )}
+
+          {/* Skip button */}
+          {!answers[current.id] && (
+            <button
+              onClick={handleSkip}
+              className="flex-1 py-3 border-2 border-orange-200 bg-orange-50 text-orange-600 rounded-xl font-semibold hover:bg-orange-100 transition-colors"
+            >
+              🤷 مش عارف
+            </button>
+          )}
+
           {currentIndex < questions.length - 1 ? (
             <button
               onClick={() => setCurrentIndex(i => i + 1)}
               disabled={!answers[current.id]}
               className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-200 text-white rounded-xl font-semibold transition-colors"
             >
-              ← التالي
+              ← الجاي
             </button>
           ) : (
             <button
@@ -199,7 +226,7 @@ export default function QuizPage() {
               disabled={submitting}
               className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-200 text-white rounded-xl font-bold text-lg transition-colors"
             >
-              {submitting ? 'جاري التقييم...' : '✅ تسليم الإجابات'}
+              {submitting ? 'بيتم التقييم...' : '✅ سلم الإجابات'}
             </button>
           )}
         </div>

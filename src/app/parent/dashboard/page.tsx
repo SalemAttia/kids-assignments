@@ -19,6 +19,7 @@ interface SessionWithReport {
 
 interface WeeklyStats {
   sessionCount: number
+  totalMinutes: number
   avgScore: number
   maxScore: number
   minScore: number
@@ -95,7 +96,7 @@ export default function ParentDashboard() {
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-screen">
-      <p className="text-xl text-slate-500">جاري التحميل...</p>
+      <p className="text-xl text-slate-500">بيتحمل...</p>
     </div>
   )
 
@@ -103,12 +104,12 @@ export default function ParentDashboard() {
     <main className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-800">لوحة متابعة الدراسة</h1>
+          <h1 className="text-3xl font-bold text-blue-800">لوحة متابعة المذاكرة</h1>
           <button
             onClick={() => { sessionStorage.removeItem('parentAuth'); router.push('/') }}
             className="text-sm text-slate-500 hover:text-slate-700 underline"
           >
-            تسجيل الخروج
+            اخرج
           </button>
         </div>
 
@@ -138,15 +139,16 @@ export default function ParentDashboard() {
                 <div className="text-4xl">{user.grade === 6 ? '🧒' : '👦'}</div>
                 <div>
                   <h2 className="text-2xl font-bold text-blue-800">{user.name}</h2>
-                  <p className="text-slate-500">الصف {user.grade === 6 ? 'السادس الابتدائي' : 'الثالث الإعدادي'} · {user.points} نقطة · 🔥 {user.streak} يوم</p>
+                  <p className="text-slate-500">الصف {user.grade === 6 ? 'السادسة ابتدائي' : 'التالتة إعدادي'} · {user.points} نقطة · 🔥 {user.streak} يوم</p>
                 </div>
               </div>
 
               {/* Weekly Stats */}
               {stats && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
                   {[
-                    { label: 'جلسات هذا الأسبوع', value: stats.sessionCount },
+                    { label: 'جلسات الأسبوع ده', value: stats.sessionCount },
+                    { label: 'ساعات المذاكرة', value: stats.totalMinutes >= 60 ? `${Math.floor(stats.totalMinutes/60)}س ${stats.totalMinutes%60}د` : `${stats.totalMinutes} د` },
                     { label: 'متوسط الدرجات', value: `${stats.avgScore}%` },
                     { label: 'أعلى درجة', value: `${stats.maxScore}%` },
                     { label: 'أدنى درجة', value: `${stats.minScore}%` },
@@ -162,7 +164,7 @@ export default function ParentDashboard() {
               {/* Score Chart */}
               {chartData.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-slate-700 mb-3">الدرجات الأخيرة</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 mb-3">آخر الدرجات</h3>
                   <ResponsiveContainer width="100%" height={200}>
                     <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -178,7 +180,7 @@ export default function ParentDashboard() {
               {/* Subject Breakdown */}
               {subjectData.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-slate-700 mb-3">المواد المدروسة هذا الأسبوع</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 mb-3">المواد اللي اتذاكرت الأسبوع ده</h3>
                   <ResponsiveContainer width="100%" height={160}>
                     <BarChart data={subjectData}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -201,7 +203,7 @@ export default function ParentDashboard() {
                     disabled={loadingSummary[user.id]}
                     className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                   >
-                    {loadingSummary[user.id] ? 'جاري التوليد...' : '🔄 توليد ملخص'}
+                    {loadingSummary[user.id] ? 'بيتم التوليد...' : '🔄 اعمل ملخص'}
                   </button>
                 </div>
 
@@ -210,28 +212,28 @@ export default function ParentDashboard() {
                     <p className="text-slate-700 leading-relaxed bg-blue-50 rounded-xl p-4">{summary.summary}</p>
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div className="bg-green-50 rounded-xl p-4">
-                        <h4 className="font-semibold text-green-700 mb-2">✅ نقاط القوة</h4>
+                        <h4 className="font-semibold text-green-700 mb-2">✅ نقط القوة</h4>
                         <ul className="space-y-1">{summary.strengths.map((s, i) => <li key={i} className="text-sm text-slate-600">• {s}</li>)}</ul>
                       </div>
                       <div className="bg-orange-50 rounded-xl p-4">
-                        <h4 className="font-semibold text-orange-700 mb-2">⚠️ نقاط تحتاج تحسين</h4>
+                        <h4 className="font-semibold text-orange-700 mb-2">⚠️ نقط محتاجة تحسين</h4>
                         <ul className="space-y-1">{summary.weaknesses.map((s, i) => <li key={i} className="text-sm text-slate-600">• {s}</li>)}</ul>
                       </div>
                     </div>
                     <div className="bg-purple-50 rounded-xl p-4">
-                      <h4 className="font-semibold text-purple-700 mb-2">💡 توصيات</h4>
+                      <h4 className="font-semibold text-purple-700 mb-2">💡 نصايح وتوصيات</h4>
                       <ul className="space-y-1">{summary.recommendations.map((s, i) => <li key={i} className="text-sm text-slate-600">• {s}</li>)}</ul>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-slate-400 text-sm">اضغط على &quot;توليد ملخص&quot; للحصول على تقرير أسبوعي مفصل</p>
+                  <p className="text-slate-400 text-sm">اضغط على &quot;اعمل ملخص&quot; عشان تاخد تقرير أسبوعي مفصل</p>
                 )}
               </div>
 
               {/* Recent Sessions */}
               {userSessions.length > 0 && (
                 <div className="border-t border-slate-100 pt-6 mt-6">
-                  <h3 className="text-lg font-semibold text-slate-700 mb-4">آخر الجلسات (30 يوم)</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 mb-4">آخر الجلسات (آخر 30 يوم)</h3>
                   <div className="space-y-3">
                     {userSessions.slice(0, 5).map(session => (
                       <div key={session.id} className="flex items-center justify-between bg-slate-50 rounded-xl p-4">

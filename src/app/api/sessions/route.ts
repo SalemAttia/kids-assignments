@@ -7,28 +7,31 @@ const SessionSchema = z.object({
   subject: z.string(),
   description: z.string().min(5),
   imageUrl: z.string().url().optional(),
+  durationMinutes: z.number().int().min(0).optional(),
 })
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { userId, subject, description, imageUrl } = SessionSchema.parse(body)
+    const { userId, subject, description, imageUrl, durationMinutes } = SessionSchema.parse(body)
 
     const supabase = await createServerClient()
     const { data, error } = await supabase
       .from('study_sessions')
-      .insert({ user_id: userId, subject, description, image_url: imageUrl ?? null })
+      .insert({
+        user_id: userId,
+        subject,
+        description,
+        image_url: imageUrl ?? null,
+        duration_minutes: durationMinutes ?? 0,
+      })
       .select('id')
       .single()
 
     if (error) throw error
-
     return NextResponse.json({ sessionId: data.id })
   } catch (err: unknown) {
     console.error(err)
-    return NextResponse.json(
-      { error: 'فشل حفظ جلسة الدراسة' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'فشل حفظ جلسة الدراسة' }, { status: 500 })
   }
 }

@@ -14,31 +14,37 @@ export default function HomePage() {
   const router = useRouter()
 
   useEffect(() => {
-    createClient()
-      .from('users')
-      .select('*')
-      .then(({ data, error }) => {
+    const loadUsers = async () => {
+      try {
+        const { data, error } = await createClient()
+          .from('users')
+          .select('*')
+
         if (error) console.error('Supabase error:', error.message)
-        if (data) setUsers(data)
-      })
-      .finally(() => setLoading(false))
+        if (data) setUsers([...data].sort((a, b) => b.name.localeCompare(a.name, 'ar')))
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void loadUsers()
   }, [])
 
   function handleSelect(user: User) {
     setUserId(user.id)
-    router.push('/study')
+    router.push('/hub')
   }
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-screen">
-      <p className="text-xl text-slate-500">جاري التحميل...</p>
+      <p className="text-xl text-slate-500">بيتحمل...</p>
     </div>
   )
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-6 bg-gradient-to-b from-blue-50 to-white">
-      <h1 className="text-4xl font-bold text-blue-800 mb-2">مساعد الدراسة</h1>
-      <p className="text-slate-500 mb-10 text-lg">اختر اسمك للبدء</p>
+      <h1 className="text-4xl font-bold text-blue-800 mb-2">مساعد المذاكرة</h1>
+      <p className="text-slate-500 mb-10 text-lg">اختار اسمك عشان تبدأ</p>
       <div className="flex flex-col sm:flex-row gap-6 w-full max-w-md">
         {users.map((user) => (
           <button
@@ -48,7 +54,7 @@ export default function HomePage() {
           >
             <div className="text-5xl mb-3">{user.grade === 6 ? '🧒' : '👦'}</div>
             <div className="text-2xl font-bold text-blue-800">{user.name}</div>
-            <div className="text-slate-500 mt-1">الصف {user.grade === 6 ? 'السادس الابتدائي' : 'الثالث الإعدادي'}</div>
+            <div className="text-slate-500 mt-1">الصف {user.grade === 6 ? 'السادسة ابتدائي' : 'التالتة إعدادي'}</div>
             {user.streak > 0 && (
               <div className="mt-3 text-sm text-orange-500 font-semibold">🔥 {user.streak} يوم متتالي</div>
             )}
@@ -59,7 +65,7 @@ export default function HomePage() {
         onClick={() => router.push('/parent')}
         className="mt-12 text-sm text-slate-400 hover:text-slate-600 underline"
       >
-        لوحة تحكم ولي الأمر
+        لوحة ولي الأمر
       </button>
     </main>
   )

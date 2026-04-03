@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
 
   const { data, error } = await supabase
     .from('study_sessions')
-    .select('subject, reports(total_score)')
+    .select('subject, duration_minutes, reports(total_score)')
     .eq('user_id', userId)
     .gte('created_at', weekStart.toISOString())
 
@@ -28,8 +28,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
     return acc
   }, {} as Record<string, number>)
 
+  const totalMinutes = sessions.reduce((acc, s) => acc + ((s as unknown as {duration_minutes: number}).duration_minutes || 0), 0)
+
   return NextResponse.json({
     sessionCount: sessions.length,
+    totalMinutes,
     avgScore: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
     maxScore: scores.length ? Math.max(...scores) : 0,
     minScore: scores.length ? Math.min(...scores) : 0,
