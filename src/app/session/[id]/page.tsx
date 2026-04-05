@@ -28,6 +28,7 @@ interface SessionDetail {
   id: string
   subject: string
   description: string
+  image_url?: string | null
   duration_minutes: number
   created_at: string
   reports: Report[]
@@ -57,6 +58,7 @@ export default function SessionDetailPage() {
   const [session, setSession] = useState<SessionDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   const sessionId = params?.id as string
 
@@ -92,6 +94,18 @@ export default function SessionDetailPage() {
     </main>
   )
 
+  // Parse image URLs (can be null, single URL string, or JSON array)
+  const imageUrls: string[] = (() => {
+    if (!session.image_url) return []
+    try {
+      const parsed = JSON.parse(session.image_url)
+      if (Array.isArray(parsed)) return parsed.filter((u: unknown) => typeof u === 'string' && u.length > 0)
+    } catch {
+      // not JSON, treat as single URL
+    }
+    return [session.image_url]
+  })()
+
   const report = session.reports?.[0] ?? null
   const score = report?.total_score ?? null
   const isExcellent = score !== null && score >= 80
@@ -124,12 +138,37 @@ export default function SessionDetailPage() {
           <span className="text-4xl">{SUBJECT_EMOJIS[session.subject] ?? '📚'}</span>
           <div className="flex-1">
             <p className="font-bold text-slate-700 text-lg">{SUBJECT_LABELS[session.subject as Subject] ?? session.subject}</p>
-            {session.description && <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{session.description}</p>}
+            {session.description && <p className="text-xs text-slate-400 mt-0.5">{session.description}</p>}
           </div>
           {formatMinutes(session.duration_minutes) && (
             <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-xl">⏱ {formatMinutes(session.duration_minutes)}</span>
           )}
         </div>
+
+        {/* Assignment Images */}
+        {imageUrls.length > 0 && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <h2 className="font-bold text-slate-700 mb-3 flex items-center gap-2 text-sm">
+              <span>🖼️</span> صور الواجب
+            </h2>
+            <div className={`grid gap-2 ${imageUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              {imageUrls.map((url, i) => (
+                <button
+                  key={i}
+                  onClick={() => setLightboxUrl(url)}
+                  className="relative overflow-hidden rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`صورة ${i + 1}`}
+                    className={`w-full object-cover ${imageUrls.length === 1 ? 'max-h-64' : 'h-32'}`}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Score card */}
         {score !== null ? (
@@ -230,6 +269,28 @@ export default function SessionDetailPage() {
         </button>
 
       </div>
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/20 text-white text-xl flex items-center justify-center"
+          >
+            ✕
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt="صورة مكبرة"
+            className="max-w-full max-h-[85vh] rounded-2xl object-contain"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       <BottomNav />
     </main>
   )
