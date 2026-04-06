@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { SUBJECT_LABELS } from '@/types'
 import type { User, Subject } from '@/types'
@@ -54,6 +53,51 @@ const PRAYER_LABELS: Record<PrayerKey, string> = {
 }
 const DAY_LABELS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 
+interface AnswerReview {
+  question_text: string
+  student_answer: string
+  correct_answer: string
+  is_correct: boolean
+  explanation: string
+}
+
+interface SessionDetailReport {
+  id: string
+  total_score: number
+  feedback: string
+  mistakes: unknown[]
+  suggestions: string[]
+  all_answers_review: AnswerReview[] | null
+  created_at: string
+}
+
+interface SessionDetail {
+  id: string
+  subject: string
+  description: string
+  image_url?: string | null
+  duration_minutes: number
+  created_at: string
+  reports: SessionDetailReport[]
+}
+
+function formatMinutes(m: number) {
+  if (!m || m === 0) return null
+  if (m < 60) return `${m} د`
+  return `${Math.floor(m / 60)}س ${m % 60 > 0 ? `${m % 60}د` : ''}`
+}
+
+const SUBJECT_EMOJIS: Record<string, string> = {
+  arabic: '📖', math: '🔢', science: '🔬', english: '💬',
+  social_studies: '🌍', religion: '🌙', computer: '💻', art: '🎨', other: '📚',
+}
+
+const SCORE_GRADIENT: Record<string, string> = {
+  excellent: 'from-yellow-400 via-orange-400 to-pink-500',
+  good: 'from-blue-400 to-purple-500',
+  low: 'from-red-400 to-rose-500',
+}
+
 function getPastDays(n: number): string[] {
   return Array.from({ length: n }, (_, i) => {
     const d = new Date()
@@ -71,6 +115,28 @@ export default function ParentDashboard() {
   const [loadingSummary, setLoadingSummary] = useState<Record<string, boolean>>({})
   const [prayerLogs, setPrayerLogs] = useState<Record<string, PrayerLog[]>>({})
   const [loading, setLoading] = useState(true)
+  const [selectedSession, setSelectedSession] = useState<SessionDetail | null>(null)
+  const [modalLoading, setModalLoading] = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+
+  async function openSessionModal(sessionId: string) {
+    setModalLoading(true)
+    setSelectedSession(null)
+    try {
+      const res = await fetch(`/api/session/${sessionId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setSelectedSession(data.session)
+      }
+    } catch { /* ignore */ }
+    setModalLoading(false)
+  }
+
+  function closeModal() {
+    setSelectedSession(null)
+    setModalLoading(false)
+    setLightboxUrl(null)
+  }
 
   useEffect(() => {
     if (sessionStorage.getItem('parentAuth') !== 'true') {
@@ -365,7 +431,7 @@ export default function ParentDashboard() {
                   <h3 className="text-lg font-semibold text-slate-700 mb-4">آخر الجلسات (آخر 30 يوم)</h3>
                   <div className="space-y-3">
                     {userSessions.slice(0, 5).map(session => (
-                      <Link key={session.id} href={`/parent/session/${session.id}`} className="flex items-center justify-between bg-slate-50 rounded-xl p-4 hover:bg-slate-100 transition-colors cursor-pointer">
+                      <button key={session.id} onClick={() => openSessionModal(session.id)} className="w-full flex items-center justify-between bg-slate-50 rounded-xl p-4 hover:bg-slate-100 transition-colors cursor-pointer text-right">
                         <div>
                           <span className="font-medium text-slate-700">{SUBJECT_LABELS[session.subject as Subject] || session.subject}</span>
                           <p className="text-xs text-slate-400 mt-0.5">{new Date(session.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
@@ -375,7 +441,7 @@ export default function ParentDashboard() {
                             {session.reports[0].total_score}%
                           </div>
                         )}
-                      </Link>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -384,6 +450,186 @@ export default function ParentDashboard() {
           )
         })}
       </div>
+
+      {/* Session Detail Modal */}
+      {(modalLoading || selectedSession) && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={closeModal}>
+          <div
+            className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+            dir="rtl"
+            onClick={e => e.stopPropagation()}
+          >
+            {modalLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="text-5xl animate-bounce">📋</div>
+              </div>
+            ) : selectedSession ? (() => {
+              const imageUrls: string[] = (() => {
+                if (!selectedSession.image_url) return []
+                try {
+                  const parsed = JSON.parse(selectedSession.image_url)
+                  if (Array.isArray(parsed)) return parsed.filter((u: unknown) => typeof u === 'string' && u.length > 0)
+                } catch { /* not JSON */ }
+                return [selectedSession.image_url]
+              })()
+
+              const report = selectedSession.reports?.[0] ?? null
+              const score = report?.total_score ?? null
+              const isExcellent = score !== null && score >= 80
+              const isGood = score !== null && score >= 60
+              const gradientKey = isExcellent ? 'excellent' : isGood ? 'good' : 'low'
+              const scoreEmoji = isExcellent ? '🌟' : isGood ? '👍' : '💪'
+              const allAnswers: AnswerReview[] = report?.all_answers_review ?? []
+              const correctCount = allAnswers.filter(a => a.is_correct).length
+
+              return (
+                <div className="p-5 space-y-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">{SUBJECT_EMOJIS[selectedSession.subject] ?? '📚'}</span>
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-800">
+                          {SUBJECT_LABELS[selectedSession.subject as Subject] ?? selectedSession.subject}
+                        </h2>
+                        <p className="text-xs text-slate-400">
+                          {new Date(selectedSession.created_at).toLocaleDateString('ar-EG', { weekday: 'long', month: 'long', day: 'numeric' })}
+                        </p>
+                      </div>
+                    </div>
+                    <button onClick={closeModal} className="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-500 text-sm transition-colors">✕</button>
+                  </div>
+
+                  {/* Description + Duration */}
+                  {(selectedSession.description || formatMinutes(selectedSession.duration_minutes)) && (
+                    <div className="bg-white rounded-xl p-3 shadow-sm flex items-center justify-between">
+                      {selectedSession.description && <p className="text-xs text-slate-500 flex-1">{selectedSession.description}</p>}
+                      {formatMinutes(selectedSession.duration_minutes) && (
+                        <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-xl mr-2">⏱ {formatMinutes(selectedSession.duration_minutes)}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Assignment Images */}
+                  {imageUrls.length > 0 && (
+                    <div className="bg-white rounded-xl p-3 shadow-sm">
+                      <h3 className="font-bold text-slate-700 mb-2 text-sm">🖼️ صور الواجب</h3>
+                      <div className={`grid gap-2 ${imageUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                        {imageUrls.map((url, i) => (
+                          <button key={i} onClick={() => setLightboxUrl(url)} className="relative overflow-hidden rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt={`صورة ${i + 1}`} className={`w-full object-cover ${imageUrls.length === 1 ? 'max-h-48' : 'h-28'}`} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Score Card */}
+                  {score !== null ? (
+                    <>
+                      <div className={`bg-gradient-to-br ${SCORE_GRADIENT[gradientKey]} rounded-2xl p-5 text-center text-white shadow-xl`}>
+                        <div className="text-4xl mb-1">{scoreEmoji}</div>
+                        <div className="text-6xl font-black mb-1">{score}</div>
+                        <div className="text-white/80 text-sm mb-1">من 100</div>
+                        {allAnswers.length > 0 && (
+                          <div className="text-xs text-white/70">{correctCount} صح من {allAnswers.length} سؤال</div>
+                        )}
+                      </div>
+
+                      {/* Feedback */}
+                      {report.feedback && (
+                        <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-blue-50">
+                          <h3 className="font-black text-slate-700 mb-2 flex items-center gap-2 text-sm">
+                            <span>💬</span> رأي المدرس
+                          </h3>
+                          <p className="text-slate-600 leading-relaxed text-sm">{report.feedback}</p>
+                        </div>
+                      )}
+
+                      {/* Q&A Review */}
+                      {allAnswers.length > 0 && (
+                        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                          <div className="p-3 border-b border-slate-100 flex items-center justify-between">
+                            <span className="font-black text-slate-700 flex items-center gap-2 text-sm">
+                              <span>📋</span> الأسئلة والإجابات
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${isExcellent ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {correctCount}/{allAnswers.length}
+                            </span>
+                          </div>
+                          <div className="divide-y divide-slate-50">
+                            {allAnswers.map((a, i) => (
+                              <div key={i} className={`p-3 ${a.is_correct ? 'bg-green-50' : 'bg-red-50'}`}>
+                                <div className="flex items-start gap-2 mb-1">
+                                  <span className="text-lg flex-shrink-0">{a.is_correct ? '✅' : '❌'}</span>
+                                  <p className="text-sm font-bold text-slate-700 leading-snug">{a.question_text}</p>
+                                </div>
+                                <div className="mr-7 space-y-1">
+                                  <p className={`text-sm ${a.is_correct ? 'text-green-700' : 'text-red-600'}`}>
+                                    إجابتك: <span className="font-bold">{a.student_answer || '—'}</span>
+                                  </p>
+                                  {!a.is_correct && (
+                                    <p className="text-sm text-green-700">
+                                      الصح: <span className="font-bold">{a.correct_answer}</span>
+                                    </p>
+                                  )}
+                                  {a.explanation && (
+                                    <p className="text-xs text-slate-500 bg-white rounded-xl p-2 mt-1 leading-relaxed">{a.explanation}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* No answers available */}
+                      {allAnswers.length === 0 && (
+                        <div className="bg-white rounded-xl p-4 shadow-sm text-center text-slate-400 text-sm">
+                          تفاصيل الإجابات مش متاحة للجلسات القديمة
+                        </div>
+                      )}
+
+                      {/* Suggestions */}
+                      {report.suggestions && report.suggestions.length > 0 && (
+                        <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-purple-50">
+                          <h3 className="font-black text-slate-700 mb-2 flex items-center gap-2 text-sm">
+                            <span>💡</span> نصايح عشان تبقى أحسن
+                          </h3>
+                          <ul className="space-y-2">
+                            {report.suggestions.map((s, i) => (
+                              <li key={i} className="flex gap-2 text-sm text-slate-600 bg-purple-50 rounded-xl p-2">
+                                <span className="text-purple-400 flex-shrink-0 font-bold">{i + 1}.</span>
+                                <span>{s}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="bg-white rounded-xl p-6 shadow-sm text-center">
+                      <div className="text-4xl mb-2">📝</div>
+                      <p className="text-slate-500 font-medium">الجلسة دي من غير اختبار</p>
+                      <p className="text-slate-400 text-sm mt-1">ما اتعملش اختبار في الجلسة دي</p>
+                    </div>
+                  )}
+                </div>
+              )
+            })() : null}
+          </div>
+        </div>
+      )}
+
+      {/* Image Lightbox */}
+      {lightboxUrl && (
+        <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onClick={() => setLightboxUrl(null)}>
+          <button onClick={() => setLightboxUrl(null)} className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/20 text-white text-xl flex items-center justify-center">✕</button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightboxUrl} alt="صورة مكبرة" className="max-w-full max-h-[85vh] rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
     </main>
   )
 }
