@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { SUBJECT_LABELS } from '@/types'
 import type { User, Subject } from '@/types'
@@ -364,7 +365,7 @@ export default function ParentDashboard() {
                   <h3 className="text-lg font-semibold text-slate-700 mb-4">آخر الجلسات (آخر 30 يوم)</h3>
                   <div className="space-y-3">
                     {userSessions.slice(0, 5).map(session => (
-                      <div key={session.id} className="flex items-center justify-between bg-slate-50 rounded-xl p-4">
+                      <Link key={session.id} href={`/parent/session/${session.id}`} className="flex items-center justify-between bg-slate-50 rounded-xl p-4 hover:bg-slate-100 transition-colors cursor-pointer">
                         <div>
                           <span className="font-medium text-slate-700">{SUBJECT_LABELS[session.subject as Subject] || session.subject}</span>
                           <p className="text-xs text-slate-400 mt-0.5">{new Date(session.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
@@ -374,7 +375,7 @@ export default function ParentDashboard() {
                             {session.reports[0].total_score}%
                           </div>
                         )}
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 </div>
