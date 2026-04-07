@@ -26,8 +26,16 @@ export async function POST(req: NextRequest) {
       ? imageUrls
       : imageUrl ? [imageUrl] : []
 
+    // Enforce minimum 2 images for new sessions (imageUrls array flow)
+    if (imageUrls !== undefined && imageUrls.length > 0 && imageUrls.length < 2) {
+      return NextResponse.json(
+        { error: 'لازم ترفع صورتين على الأقل من الكتاب عشان نعملك أسئلة كويسة' },
+        { status: 400 }
+      )
+    }
+
     const supabase = await createServerClient()
-    const prompt = buildGenerateQuestionsPrompt(subject as Subject, description, grade)
+    const prompt = buildGenerateQuestionsPrompt(subject as Subject, description, grade, allImageUrls.length > 0)
 
     const messages: Parameters<typeof openai.chat.completions.create>[0]['messages'] = [
       { role: 'system', content: prompt.system },

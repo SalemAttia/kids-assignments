@@ -84,6 +84,8 @@ export interface GenerateQuestionsRequest {
   subject: Subject
   description: string
   grade: number
+  imageUrls: string[]
+  /** @deprecated Use imageUrls instead */
   imageUrl?: string
 }
 
