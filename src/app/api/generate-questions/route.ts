@@ -61,7 +61,16 @@ export async function POST(req: NextRequest) {
     })
 
     const raw = completion.choices[0].message.content || '{}'
-    const { questions } = parseJSON(GeneratedQuestionsSchema, raw)
+    const { questions: parsed } = parseJSON(GeneratedQuestionsSchema, raw)
+
+    // Only keep multiple-choice questions with valid options
+    const questions = parsed.filter(q =>
+      q.question_type === 'multiple_choice' && Array.isArray(q.options) && q.options.length >= 2
+    )
+
+    if (questions.length === 0) {
+      return NextResponse.json({ error: 'فشل توليد الأسئلة - حاول تاني' }, { status: 500 })
+    }
 
     const rows = questions.map((q, i) => ({
       session_id: sessionId,
