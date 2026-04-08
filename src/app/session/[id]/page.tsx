@@ -4,7 +4,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useStudySession } from '@/hooks/useStudySession'
 import { SUBJECT_LABELS } from '@/types'
-import type { Subject } from '@/types'
+import type { Subject, Question } from '@/types'
 import BottomNav from '@/components/BottomNav'
 
 interface AnswerReview {
@@ -33,6 +33,7 @@ interface SessionDetail {
   duration_minutes: number
   created_at: string
   reports: Report[]
+  questions: Question[]
 }
 
 function formatMinutes(m: number) {
@@ -56,7 +57,7 @@ export default function SessionDetailPage() {
   const router = useRouter()
   const params = useParams()
   const { userId, loaded } = useCurrentUser()
-  const { setSessionId } = useStudySession()
+  const { setSessionId, setQuestions } = useStudySession()
   const [session, setSession] = useState<SessionDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -264,23 +265,37 @@ export default function SessionDetailPage() {
         )}
 
         {/* Retake actions */}
-        <div className="space-y-3">
-          <button
-            onClick={() => {
-              setSessionId(sessionId)
-              router.push('/quiz')
-            }}
-            className="w-full py-4 bg-gradient-to-r from-orange-400 to-amber-500 text-white text-lg font-black rounded-2xl shadow-lg active:scale-95 transition-all"
-          >
-            ✨ أسئلة جديدة على نفس الدرس!
-          </button>
-          <button
-            onClick={() => router.push('/study')}
-            className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-lg font-bold rounded-2xl shadow-lg active:scale-95 transition-all"
-          >
-            📚 ابدأ مذاكرة جديدة
-          </button>
-        </div>
+        {score !== null && (
+          <div className="space-y-3">
+            {session.questions && session.questions.length > 0 && (
+              <button
+                onClick={() => {
+                  setSessionId(sessionId)
+                  setQuestions(session.questions, sessionId)
+                  router.push('/quiz')
+                }}
+                className="w-full py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white text-lg font-black rounded-2xl shadow-lg active:scale-95 transition-all"
+              >
+                🔄 حل نفس الأسئلة تاني!
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setSessionId(sessionId)
+                router.push('/quiz')
+              }}
+              className="w-full py-4 bg-gradient-to-r from-orange-400 to-amber-500 text-white text-lg font-black rounded-2xl shadow-lg active:scale-95 transition-all"
+            >
+              ✨ أسئلة جديدة على نفس الدرس!
+            </button>
+          </div>
+        )}
+        <button
+          onClick={() => router.push('/study')}
+          className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-lg font-bold rounded-2xl shadow-lg active:scale-95 transition-all"
+        >
+          📚 ابدأ مذاكرة جديدة
+        </button>
 
       </div>
       {/* Lightbox */}

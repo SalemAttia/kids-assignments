@@ -59,7 +59,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .from('study_sessions')
     .select(`
       id, subject, description, image_url, duration_minutes, created_at,
-      reports(id, total_score, feedback, mistakes, suggestions, all_answers_review, created_at)
+      reports(id, total_score, feedback, mistakes, suggestions, all_answers_review, created_at),
+      questions(id, session_id, question_text, question_type, options, correct_answer, order_index)
     `)
     .eq('id', id)
     .single()
@@ -68,12 +69,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!data) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
   // Normalize: Supabase may return reports as object or array depending on FK uniqueness
-  const session = {
-    ...data,
-    reports: data.reports
-      ? (Array.isArray(data.reports) ? data.reports : [data.reports])
-      : [],
-  }
+  const reports = data.reports
+    ? (Array.isArray(data.reports) ? data.reports : [data.reports])
+    : []
+  const questions = data.questions
+    ? (Array.isArray(data.questions) ? data.questions : [data.questions])
+    : []
+  // Sort questions by order_index
+  questions.sort((a: { order_index: number }, b: { order_index: number }) => a.order_index - b.order_index)
+
+  const session = { ...data, reports, questions }
 
   return NextResponse.json({ session })
 }
