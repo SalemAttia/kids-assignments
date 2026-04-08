@@ -25,6 +25,7 @@ const HINTS = [
   'في حاجة مش فاهمها تماماً؟',
 ]
 
+const MIN_IMAGES = 2
 const MAX_IMAGES = 5
 
 export default function StudyPage() {
@@ -132,6 +133,7 @@ export default function StudyPage() {
   async function handleSubmit() {
     if (!subject) return
     if (description.trim().length < 10) { setError('اكتب أكتر شوية! (10 أحرف على الأقل) ✏️'); return }
+    if (images.length < MIN_IMAGES) { setError(`لازم ترفع ${MIN_IMAGES} صور على الأقل من الكتاب عشان نعملك أسئلة كويسة! 📷`); return }
 
     setLoading(true)
     setError('')
@@ -296,9 +298,9 @@ export default function StudyPage() {
           <div className="animate-fade-in">
             <div className="text-center mb-6">
               <div className="text-5xl mb-3">📷</div>
-              <h1 className="text-2xl font-bold text-slate-800">ضيف صور (اختياري)</h1>
+              <h1 className="text-2xl font-bold text-slate-800">ضيف صور من الكتاب</h1>
               <p className="text-slate-500 text-sm mt-1">
-                صور من الكتاب أو الدفتر بتساعدنا نسألك أسئلة أحسن! (حتى {MAX_IMAGES} صور)
+                صور من الكتاب أو الدفتر عشان نسألك أسئلة على اللي ذاكرته! (صورتين على الأقل، حتى {MAX_IMAGES} صور)
               </p>
             </div>
 
@@ -365,6 +367,12 @@ export default function StudyPage() {
               </div>
             )}
 
+            {images.length < MIN_IMAGES && (
+              <p className="text-center text-amber-600 text-sm mb-4 font-medium">
+                محتاج {MIN_IMAGES - images.length} صورة كمان على الأقل
+              </p>
+            )}
+
             {images.length >= MAX_IMAGES && (
               <p className="text-center text-amber-600 text-sm mb-4 font-medium">
                 وصلت للحد الأقصى ({MAX_IMAGES} صور)
@@ -395,13 +403,13 @@ export default function StudyPage() {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={loading}
+              disabled={loading || images.length < MIN_IMAGES}
               className="w-full py-4 bg-gradient-to-r from-green-500 to-teal-500 disabled:from-slate-300 disabled:to-slate-400 text-white text-xl font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95"
             >
               {loading ? '⏳ بيتم الحفظ...' : '🚀 ابدأ الأسئلة!'}
             </button>
 
-            <p className="text-center text-slate-400 text-xs mt-3">تقدر تعدي إضافة الصور وتبدأ على طول</p>
+            <p className="text-center text-slate-400 text-xs mt-3">صور الكتاب بتساعدنا نعملك أسئلة أدق!</p>
           </div>
         )}
 
