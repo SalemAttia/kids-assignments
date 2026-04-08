@@ -147,6 +147,16 @@ export default function QuizPage() {
     </div>
   )
 
+  if (questions.length === 0) return (
+    <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6 bg-gradient-to-br from-blue-50 to-purple-50">
+      <div className="text-6xl">😅</div>
+      <p className="text-xl text-slate-600 font-bold text-center">مفيش أسئلة متاحة</p>
+      <button onClick={() => router.replace('/study')} className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold text-lg">
+        ارجع وحاول تاني
+      </button>
+    </div>
+  )
+
   const current = questions[currentIndex]
   const progress = Math.round(((currentIndex + 1) / questions.length) * 100)
   const encouragement = ENCOURAGEMENTS[currentIndex % ENCOURAGEMENTS.length]
