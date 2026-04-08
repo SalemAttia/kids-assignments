@@ -118,6 +118,8 @@ export default function ParentDashboard() {
   const [selectedSession, setSelectedSession] = useState<SessionDetail | null>(null)
   const [modalLoading, setModalLoading] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   async function openSessionModal(sessionId: string) {
     setModalLoading(true)
@@ -136,6 +138,21 @@ export default function ParentDashboard() {
     setSelectedSession(null)
     setModalLoading(false)
     setLightboxUrl(null)
+    setShowDeleteConfirm(false)
+    setDeleting(false)
+  }
+
+  async function handleDeleteSession(sessionId: string) {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/session/${sessionId}`, { method: 'DELETE' })
+      if (res.ok) {
+        closeModal()
+        // Refresh sessions list
+        loadData()
+      }
+    } catch { /* ignore */ }
+    setDeleting(false)
   }
 
   useEffect(() => {
@@ -497,7 +514,16 @@ export default function ParentDashboard() {
                         </p>
                       </div>
                     </div>
-                    <button onClick={closeModal} className="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-500 text-sm transition-colors">✕</button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center text-red-500 text-sm transition-colors"
+                        title="حذف الجلسة"
+                      >
+                        🗑
+                      </button>
+                      <button onClick={closeModal} className="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-500 text-sm transition-colors">✕</button>
+                    </div>
                   </div>
 
                   {/* Description + Duration */}
@@ -613,6 +639,31 @@ export default function ParentDashboard() {
                       <div className="text-4xl mb-2">📝</div>
                       <p className="text-slate-500 font-medium">الجلسة دي من غير اختبار</p>
                       <p className="text-slate-400 text-sm mt-1">ما اتعملش اختبار في الجلسة دي</p>
+                    </div>
+                  )}
+                  {/* Delete Confirmation */}
+                  {showDeleteConfirm && (
+                    <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 space-y-3">
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">⚠️</div>
+                        <h3 className="font-bold text-red-700">متأكد إنك عايز تحذف الجلسة دي؟</h3>
+                        <p className="text-xs text-red-500 mt-1">هيتم حذف كل الأسئلة والإجابات والتقرير - مش هتقدر ترجعهم</p>
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => handleDeleteSession(selectedSession.id)}
+                          disabled={deleting}
+                          className="flex-1 py-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-bold rounded-xl transition-colors"
+                        >
+                          {deleting ? '⏳ بيتم الحذف...' : '🗑 أيوه، احذف'}
+                        </button>
+                        <button
+                          onClick={() => setShowDeleteConfirm(false)}
+                          className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition-colors"
+                        >
+                          لا، ارجع
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
