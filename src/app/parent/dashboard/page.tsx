@@ -641,34 +641,37 @@ export default function ParentDashboard() {
                       <p className="text-slate-400 text-sm mt-1">ما اتعملش اختبار في الجلسة دي</p>
                     </div>
                   )}
-                  {/* Delete Confirmation */}
-                  {showDeleteConfirm && (
-                    <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 space-y-3">
-                      <div className="text-center">
-                        <div className="text-3xl mb-2">⚠️</div>
-                        <h3 className="font-bold text-red-700">متأكد إنك عايز تحذف الجلسة دي؟</h3>
-                        <p className="text-xs text-red-500 mt-1">هيتم حذف كل الأسئلة والإجابات والتقرير - مش هتقدر ترجعهم</p>
-                      </div>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => handleDeleteSession(selectedSession.id)}
-                          disabled={deleting}
-                          className="flex-1 py-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-bold rounded-xl transition-colors"
-                        >
-                          {deleting ? '⏳ بيتم الحذف...' : '🗑 أيوه، احذف'}
-                        </button>
-                        <button
-                          onClick={() => setShowDeleteConfirm(false)}
-                          className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition-colors"
-                        >
-                          لا، ارجع
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )
             })() : null}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Overlay */}
+      {showDeleteConfirm && selectedSession && (
+        <div className="fixed inset-0 z-[55] bg-black/60 flex items-center justify-center p-4" dir="rtl" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="text-center">
+              <div className="text-4xl mb-3">⚠️</div>
+              <h3 className="text-lg font-bold text-red-700">متأكد إنك عايز تحذف الجلسة دي؟</h3>
+              <p className="text-sm text-red-500 mt-2">هيتم حذف كل الأسئلة والإجابات والتقرير - مش هتقدر ترجعهم</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleDeleteSession(selectedSession.id)}
+                disabled={deleting}
+                className="flex-1 py-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-bold rounded-xl transition-colors"
+              >
+                {deleting ? '⏳ بيتم الحذف...' : '🗑 أيوه، احذف'}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition-colors"
+              >
+                لا، ارجع
+              </button>
+            </div>
           </div>
         </div>
       )}
