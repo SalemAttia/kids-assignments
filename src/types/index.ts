@@ -1,3 +1,11 @@
+export type QuizDifficulty = 'easy' | 'medium' | 'hard'
+
+export const QUIZ_DIFFICULTY_LABELS: Record<QuizDifficulty, string> = {
+  easy: 'سهل',
+  medium: 'متوسط',
+  hard: 'صعب',
+}
+
 export interface User {
   id: string
   name: string
@@ -5,6 +13,7 @@ export interface User {
   points: number
   streak: number
   last_active: string | null
+  quiz_difficulty: QuizDifficulty
   created_at: string
 }
 
@@ -84,6 +93,7 @@ export interface GenerateQuestionsRequest {
   subject: Subject
   description: string
   grade: number
+  difficulty: QuizDifficulty
   imageUrls: string[]
   /** @deprecated Use imageUrls instead */
   imageUrl?: string
