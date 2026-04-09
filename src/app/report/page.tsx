@@ -57,6 +57,11 @@ export default function ReportPage() {
     setData(JSON.parse(raw))
   }, [loaded, userId, router])
 
+  function handleRetakeQuiz() {
+    sessionStorage.removeItem('reportData')
+    router.push('/quiz')
+  }
+
   function handleNewSession() {
     clearSession()
     sessionStorage.removeItem('reportData')
@@ -191,6 +196,12 @@ export default function ReportPage() {
 
         {/* Actions */}
         <div className="space-y-3 pt-2">
+          <button
+            onClick={handleRetakeQuiz}
+            className="w-full py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-black text-xl shadow-lg active:scale-95 transition-all"
+          >
+            🔄 حل الأسئلة تاني!
+          </button>
           <button
             onClick={handleNewSession}
             className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl font-black text-xl shadow-lg active:scale-95 transition-all"
