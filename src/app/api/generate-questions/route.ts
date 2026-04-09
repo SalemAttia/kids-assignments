@@ -4,13 +4,14 @@ import { openai, OPENAI_MODEL } from '@/lib/openai/client'
 import { buildGenerateQuestionsPrompt } from '@/lib/openai/prompts'
 import { GeneratedQuestionsSchema, parseJSON } from '@/lib/openai/parser'
 import { z } from 'zod'
-import type { Subject } from '@/types'
+import type { Subject, QuizDifficulty } from '@/types'
 
 const RequestSchema = z.object({
   sessionId: z.string().uuid(),
   subject: z.string(),
   description: z.string(),
   grade: z.number(),
+  difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
   imageUrls: z.array(z.string().url()).optional(),
   // legacy single-image field
   imageUrl: z.string().url().optional(),
@@ -19,7 +20,7 @@ const RequestSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { sessionId, subject, description, grade, imageUrls, imageUrl } = RequestSchema.parse(body)
+    const { sessionId, subject, description, grade, difficulty, imageUrls, imageUrl } = RequestSchema.parse(body)
 
     // Merge image sources
     const allImageUrls: string[] = imageUrls && imageUrls.length > 0
@@ -35,7 +36,13 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = await createServerClient()
-    const prompt = buildGenerateQuestionsPrompt(subject as Subject, description, grade, allImageUrls.length > 0)
+    const prompt = buildGenerateQuestionsPrompt(
+      subject as Subject,
+      description,
+      grade,
+      (difficulty ?? 'easy') as QuizDifficulty,
+      allImageUrls.length > 0,
+    )
 
     const messages: Parameters<typeof openai.chat.completions.create>[0]['messages'] = [
       { role: 'system', content: prompt.system },

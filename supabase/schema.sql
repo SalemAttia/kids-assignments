@@ -7,6 +7,7 @@ CREATE TABLE users (
   points INT NOT NULL DEFAULT 0,
   streak INT NOT NULL DEFAULT 0,
   last_active DATE,
+  quiz_difficulty TEXT NOT NULL DEFAULT 'easy' CHECK (quiz_difficulty IN ('easy','medium','hard')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 INSERT INTO users (name, grade) VALUES ('أحمد', 8), ('محمود', 6);

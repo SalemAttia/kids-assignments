@@ -2,8 +2,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { SUBJECT_LABELS } from '@/types'
-import type { User, Subject } from '@/types'
+import { SUBJECT_LABELS, QUIZ_DIFFICULTY_LABELS } from '@/types'
+import type { User, Subject, QuizDifficulty } from '@/types'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend
@@ -120,6 +120,29 @@ export default function ParentDashboard() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [savingDifficulty, setSavingDifficulty] = useState<Record<string, boolean>>({})
+
+  async function updateDifficulty(userId: string, difficulty: QuizDifficulty) {
+    setSavingDifficulty(prev => ({ ...prev, [userId]: true }))
+    // Optimistic update
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, quiz_difficulty: difficulty } : u))
+    try {
+      const res = await fetch(`/api/users/${userId}/difficulty`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ difficulty }),
+      })
+      if (!res.ok) {
+        // Revert on failure — refetch users
+        const { data } = await createClient().from('users').select('*')
+        if (data) setUsers(data)
+      }
+    } catch {
+      const { data } = await createClient().from('users').select('*')
+      if (data) setUsers(data)
+    }
+    setSavingDifficulty(prev => ({ ...prev, [userId]: false }))
+  }
 
   async function openSessionModal(sessionId: string) {
     setModalLoading(true)
@@ -274,6 +297,35 @@ export default function ParentDashboard() {
                 <div>
                   <h2 className="text-2xl font-bold text-blue-800">{user.name}</h2>
                   <p className="text-slate-500">الصف {gradeLabel(user.grade)} · {user.points} نقطة · 🔥 {user.streak} يوم</p>
+                </div>
+              </div>
+
+              {/* Quiz Difficulty Control */}
+              <div className="mb-6 bg-indigo-50 rounded-2xl p-4 border border-indigo-100">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-indigo-800">🎯 مستوى صعوبة الأسئلة</h3>
+                    <p className="text-xs text-indigo-500 mt-0.5">اختار مستوى الأسئلة اللي هتيجي في الاختبار</p>
+                  </div>
+                  <div className="flex gap-2" role="group" aria-label="Quiz difficulty">
+                    {(['easy', 'medium', 'hard'] as QuizDifficulty[]).map(level => {
+                      const selected = user.quiz_difficulty === level
+                      return (
+                        <button
+                          key={level}
+                          onClick={() => updateDifficulty(user.id, level)}
+                          disabled={savingDifficulty[user.id]}
+                          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${
+                            selected
+                              ? 'bg-indigo-600 text-white shadow-md'
+                              : 'bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-100'
+                          }`}
+                        >
+                          {QUIZ_DIFFICULTY_LABELS[level]}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
 

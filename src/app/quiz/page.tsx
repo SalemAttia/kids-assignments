@@ -45,7 +45,7 @@ export default function QuizPage() {
     const generate = async () => {
       const { data: session } = await createClient()
         .from('study_sessions')
-        .select('subject, description, image_url, users(grade)')
+        .select('subject, description, image_url, users(grade, quiz_difficulty)')
         .eq('id', sessionId)
         .single()
 
@@ -62,6 +62,8 @@ export default function QuizPage() {
         }
       }
 
+      const userData = session.users as unknown as { grade: number; quiz_difficulty?: 'easy' | 'medium' | 'hard' }
+
       const res = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -69,7 +71,8 @@ export default function QuizPage() {
           sessionId,
           subject: session.subject,
           description: session.description,
-          grade: (session.users as unknown as {grade: number}).grade,
+          grade: userData.grade,
+          difficulty: userData.quiz_difficulty ?? 'easy',
           imageUrls,
         }),
       })
