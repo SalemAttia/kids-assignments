@@ -28,12 +28,13 @@ const SUBJECT_INSTRUCTIONS: Record<Subject, string> = {
 - اكتب الأسئلة بالعامية المصرية البسيطة
 - ممنوع تسأل عن أي مادة تانية`,
 
-  english: `- Questions MUST be about the English language only (vocabulary, grammar, reading, spelling, simple comprehension)
-- Write ALL questions, options, and the correct_answer in ENGLISH ONLY — do NOT use Arabic at any point
-- Use simple, age-appropriate English for a young student
-- Use "A.", "B.", "C." as option prefixes (not Arabic letters)
-- If the study description or images contain Arabic, translate the concepts into English — never copy Arabic text into the output
-- Do NOT ask about other subjects like math or science`,
+  english: `- الأسئلة لازم تكون عن اللغة الإنجليزية بس (كلمات، معاني، قواعد بسيطة، إملاء، قراءة بسيطة)
+- الطلاب مبيتكلموش إنجليزي كويس، فلازم الأسئلة تكون مخلوطة عربي وإنجليزي عشان تبقى سهلة عليهم
+- اكتب نص السؤال والتعليمات بالعربية (زي: "ما معنى كلمة ... ؟" أو "اختار الترجمة الصحيحة لـ ...")
+- الكلمة أو الجملة الإنجليزية اللي بتسأل عنها تبقى بالإنجليزية زي ما هي
+- الاختيارات ممكن تكون عربي (لو السؤال عن معنى كلمة إنجليزية) أو إنجليزي (لو السؤال عن إملاء أو قواعد)
+- استخدم "أ."، "ب."، "ج." كبادئات للاختيارات
+- ممنوع تسأل عن أي مادة تانية`,
 
   social_studies: `- الأسئلة لازم تكون عن الدراسات الاجتماعية بس (تاريخ مصر، جغرافيا، المجتمع، المواطنة حسب المنهج المصري)
 - اكتب الأسئلة بالعامية المصرية البسيطة
