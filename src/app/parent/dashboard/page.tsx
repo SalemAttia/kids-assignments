@@ -394,87 +394,140 @@ export default function ParentDashboard() {
                     </div>
                   )
                 }
+
+                // Summary counters
                 const totalScheduled = adh.days.reduce((a, d) => a + d.scheduled.length, 0)
-                const totalMissed = adh.days.reduce((a, d) => a + d.missed.length, 0)
                 const totalDone = adh.days.reduce(
                   (a, d) => a + d.scheduled.filter(s => d.studied.includes(s)).length,
                   0,
                 )
+                const totalMissed = adh.days.reduce((a, d) => a + d.missed.length, 0)
+                const todayDay = adh.days.find(d => d.isToday) || null
+                const todayPending = todayDay
+                  ? todayDay.scheduled.filter(s => !todayDay.studied.includes(s))
+                  : []
+
+                // Subject chip — explicit label, not just emoji
+                type ChipStatus = 'done' | 'missed' | 'pending' | 'upcoming' | 'extra'
+                const chipClass: Record<ChipStatus, string> = {
+                  done:     'bg-emerald-100 text-emerald-800 border-emerald-300',
+                  missed:   'bg-red-100 text-red-800 border-red-300 line-through',
+                  pending:  'bg-slate-100 text-slate-700 border-slate-300',
+                  upcoming: 'bg-white text-slate-400 border-slate-200',
+                  extra:    'bg-amber-100 text-amber-800 border-amber-300',
+                }
+                const chipIcon: Record<ChipStatus, string> = {
+                  done: '✓', missed: '✗', pending: '⏳', upcoming: '·', extra: '+',
+                }
+                const renderChip = (subj: string, status: ChipStatus, keyPrefix = '') => (
+                  <span
+                    key={`${keyPrefix}${subj}-${status}`}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${chipClass[status]}`}
+                  >
+                    <span className="text-[11px] font-bold">{chipIcon[status]}</span>
+                    <span>{SUBJECT_EMOJIS[subj] ?? '📚'}</span>
+                    <span>{SUBJECT_LABELS[subj as Subject] || subj}</span>
+                  </span>
+                )
 
                 return (
                   <div className="mb-6 bg-indigo-50 rounded-2xl p-5 border border-indigo-100">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-bold text-indigo-800">📅 جدول المذاكرة الأسبوعي</h3>
-                      <div className="flex gap-3 text-sm">
-                        <span className="bg-indigo-100 text-indigo-700 font-bold px-3 py-1 rounded-lg">
-                          تم: {totalDone}/{totalScheduled}
-                        </span>
-                        {totalMissed > 0 && (
-                          <span className="bg-red-100 text-red-700 font-bold px-3 py-1 rounded-lg">
-                            فات: {totalMissed}
-                          </span>
-                        )}
+                    <h3 className="text-lg font-bold text-indigo-800 mb-4">📅 جدول المذاكرة الأسبوعي</h3>
+
+                    {/* Summary cards */}
+                    <div className="grid grid-cols-3 gap-3 mb-5">
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                        <div className="text-2xl mb-0.5">✅</div>
+                        <div className="text-2xl font-black text-emerald-700 leading-none">
+                          {totalDone}
+                          <span className="text-sm font-bold text-emerald-500">/{totalScheduled}</span>
+                        </div>
+                        <div className="text-[11px] text-emerald-700 mt-1 font-semibold">اتذاكر</div>
+                      </div>
+                      <div className={`rounded-xl p-3 text-center border ${totalMissed > 0 ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className="text-2xl mb-0.5">{totalMissed > 0 ? '❌' : '🎉'}</div>
+                        <div className={`text-2xl font-black leading-none ${totalMissed > 0 ? 'text-red-700' : 'text-slate-400'}`}>
+                          {totalMissed}
+                        </div>
+                        <div className={`text-[11px] mt-1 font-semibold ${totalMissed > 0 ? 'text-red-700' : 'text-slate-500'}`}>فات</div>
+                      </div>
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                        <div className="text-2xl mb-0.5">⏳</div>
+                        <div className="text-2xl font-black text-amber-700 leading-none">
+                          {todayDay && todayDay.scheduled.length > 0 ? (
+                            <>
+                              {todayPending.length}
+                              <span className="text-sm font-bold text-amber-500">/{todayDay.scheduled.length}</span>
+                            </>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-amber-700 mt-1 font-semibold">النهاردة لسه</div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-7 gap-2">
+                    {/* Per-day list */}
+                    <div className="space-y-2">
                       {adh.days.map(day => {
                         const d = new Date(day.date)
-                        const tone =
-                          day.isFuture
-                            ? 'bg-white/60 border border-slate-100'
-                            : day.missed.length > 0
-                            ? 'bg-red-50 border border-red-200'
-                            : day.scheduled.length === 0
-                            ? 'bg-slate-50 border border-slate-100'
-                            : 'bg-emerald-50 border border-emerald-200'
+                        const dateLabel = d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })
+                        const doneSubjects = day.scheduled.filter(s => day.studied.includes(s))
+                        const missedSubjects = day.missed
+                        const pendingSubjects = day.isToday
+                          ? day.scheduled.filter(s => !day.studied.includes(s))
+                          : []
+
+                        // Row background + status badge
+                        let rowTone = 'bg-white border-slate-100'
+                        let badge: { text: string; className: string } | null = null
+                        if (day.isToday) {
+                          rowTone = 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200'
+                          badge = { text: 'النهاردة', className: 'bg-indigo-500 text-white' }
+                        } else if (day.isFuture) {
+                          rowTone = 'bg-white/60 border-slate-100'
+                          badge = { text: 'قادم', className: 'bg-slate-200 text-slate-600' }
+                        } else if (missedSubjects.length > 0) {
+                          rowTone = 'bg-red-50 border-red-200'
+                          badge = { text: 'فات', className: 'bg-red-500 text-white' }
+                        } else if (day.scheduled.length === 0 && day.extras.length === 0) {
+                          rowTone = 'bg-slate-50 border-slate-100'
+                          badge = { text: 'إجازة', className: 'bg-slate-200 text-slate-500' }
+                        } else {
+                          rowTone = 'bg-emerald-50 border-emerald-200'
+                          badge = { text: 'تم', className: 'bg-emerald-500 text-white' }
+                        }
+
                         return (
-                          <div
-                            key={day.date}
-                            className={`rounded-xl p-2 min-h-[90px] flex flex-col gap-1 text-xs ${tone} ${day.isToday ? 'ring-2 ring-indigo-400' : ''}`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className={`font-bold ${day.isToday ? 'text-indigo-700' : 'text-slate-500'}`}>
-                                {DAY_LABELS[day.dayOfWeek].slice(0, 3)}
-                              </span>
-                              <span className="text-[10px] text-slate-400">{d.getDate()}</span>
-                            </div>
-                            {day.scheduled.length === 0 ? (
-                              <span className="text-[10px] text-slate-300 mt-auto">—</span>
-                            ) : (
-                              <div className="flex flex-wrap gap-1">
-                                {day.scheduled.map(subj => {
-                                  const wasStudied = day.studied.includes(subj)
-                                  const isMissed = day.missed.includes(subj)
-                                  return (
-                                    <span
-                                      key={subj}
-                                      title={SUBJECT_LABELS[subj as Subject] || subj}
-                                      className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-sm ${
-                                        wasStudied
-                                          ? 'bg-emerald-500 text-white'
-                                          : isMissed
-                                          ? 'bg-red-200 text-red-700 line-through'
-                                          : 'bg-slate-200 text-slate-500'
-                                      }`}
-                                    >
-                                      {SUBJECT_EMOJIS[subj] ?? '📚'}
-                                    </span>
-                                  )
-                                })}
+                          <div key={day.date} className={`rounded-xl p-3 border ${rowTone}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`font-bold text-sm ${day.isToday ? 'text-indigo-900' : 'text-slate-700'}`}>
+                                  {DAY_LABELS[day.dayOfWeek]}
+                                </span>
+                                <span className="text-xs text-slate-400">{dateLabel}</span>
                               </div>
-                            )}
-                            {day.extras.length > 0 && (
-                              <div className="mt-auto flex flex-wrap gap-1 pt-1 border-t border-slate-100">
-                                {day.extras.map(subj => (
-                                  <span
-                                    key={`x-${subj}`}
-                                    title={`إضافي: ${SUBJECT_LABELS[subj as Subject] || subj}`}
-                                    className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] bg-amber-100 text-amber-700"
-                                  >
-                                    {SUBJECT_EMOJIS[subj] ?? '➕'}
-                                  </span>
-                                ))}
+                              {badge && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.className}`}>
+                                  {badge.text}
+                                </span>
+                              )}
+                            </div>
+
+                            {day.scheduled.length === 0 && day.extras.length === 0 ? (
+                              <p className="text-xs text-slate-400 text-center py-1">مفيش مذاكرة مجدولة</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {day.isFuture
+                                  ? day.scheduled.map(s => renderChip(s, 'upcoming'))
+                                  : (
+                                    <>
+                                      {doneSubjects.map(s => renderChip(s, 'done'))}
+                                      {missedSubjects.map(s => renderChip(s, 'missed'))}
+                                      {pendingSubjects.map(s => renderChip(s, 'pending'))}
+                                      {day.extras.map(s => renderChip(s, 'extra', 'ex-'))}
+                                    </>
+                                  )}
                               </div>
                             )}
                           </div>
@@ -482,19 +535,13 @@ export default function ParentDashboard() {
                       })}
                     </div>
 
-                    <div className="mt-4 flex flex-wrap gap-3 text-[11px] text-slate-500 justify-center">
-                      <span className="flex items-center gap-1">
-                        <span className="w-3 h-3 rounded bg-emerald-500 inline-block" /> تم
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-3 h-3 rounded bg-red-200 inline-block" /> فات
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-3 h-3 rounded bg-slate-200 inline-block" /> النهاردة / قادم
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-3 h-3 rounded bg-amber-100 inline-block" /> إضافي
-                      </span>
+                    {/* Legend */}
+                    <div className="mt-4 pt-3 border-t border-indigo-100 flex flex-wrap gap-2 text-[11px] text-slate-600 justify-center">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 font-semibold">✓ اتذاكر</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 border border-red-300 text-red-800 font-semibold">✗ فات</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-slate-700 font-semibold">⏳ لسه النهاردة</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-400 font-semibold">· قادم</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-800 font-semibold">+ إضافي</span>
                     </div>
                   </div>
                 )
