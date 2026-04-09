@@ -266,7 +266,7 @@ export default function SessionDetailPage() {
 
         {/* Retake / Take quiz actions */}
         <div className="space-y-3">
-          {session.questions && session.questions.length > 0 && (
+          {session.questions && session.questions.length > 0 ? (
             <button
               onClick={() => {
                 setSessionId(sessionId)
@@ -275,18 +275,19 @@ export default function SessionDetailPage() {
               }}
               className="w-full py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white text-lg font-black rounded-2xl shadow-lg active:scale-95 transition-all"
             >
-              🔄 حل نفس الأسئلة تاني!
+              🔄 حل الأسئلة تاني!
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setSessionId(sessionId)
+                router.push('/quiz')
+              }}
+              className="w-full py-4 bg-gradient-to-r from-orange-400 to-amber-500 text-white text-lg font-black rounded-2xl shadow-lg active:scale-95 transition-all"
+            >
+              ✨ ابدأ اختبار على الدرس ده!
             </button>
           )}
-          <button
-            onClick={() => {
-              setSessionId(sessionId)
-              router.push('/quiz')
-            }}
-            className="w-full py-4 bg-gradient-to-r from-orange-400 to-amber-500 text-white text-lg font-black rounded-2xl shadow-lg active:scale-95 transition-all"
-          >
-            {score !== null ? '✨ أسئلة جديدة على نفس الدرس!' : '✨ ابدأ اختبار على الدرس ده!'}
-          </button>
           <button
             onClick={() => router.push('/study')}
             className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-lg font-bold rounded-2xl shadow-lg active:scale-95 transition-all"
