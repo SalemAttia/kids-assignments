@@ -1,5 +1,46 @@
 import { Subject, SUBJECT_LABELS } from '@/types'
 
+const SUBJECT_INSTRUCTIONS: Record<Subject, string> = {
+  arabic: `- الأسئلة لازم تكون عن اللغة العربية بس (قواعد، نحو، إملاء، معاني كلمات، قراءة، فهم نصوص)
+- اكتب الأسئلة والاختيارات بالعربية الفصحى البسيطة المناسبة لعمر الطفل
+- ممنوع تسأل عن أي مادة تانية`,
+
+  math: `- الأسئلة لازم تكون عن الرياضيات بس (جمع، طرح، ضرب، قسمة، أشكال، أرقام، مسائل كلامية بسيطة)
+- اكتب الأسئلة بالعامية المصرية البسيطة، والأرقام والرموز الرياضية تتكتب عادي
+- ممنوع تسأل عن أي مادة تانية`,
+
+  science: `- الأسئلة لازم تكون عن العلوم بس (النباتات، الحيوانات، جسم الإنسان، الطقس، المادة، الفضاء حسب المنهج المصري)
+- اكتب الأسئلة بالعامية المصرية البسيطة
+- ممنوع تسأل عن أي مادة تانية`,
+
+  english: `- Questions MUST be about the English language only (vocabulary, grammar, reading, spelling, simple comprehension)
+- Write ALL questions, options, and the correct_answer in ENGLISH ONLY — do NOT use Arabic at any point
+- Use simple, age-appropriate English for a young student
+- Use "A.", "B.", "C." as option prefixes (not Arabic letters)
+- If the study description or images contain Arabic, translate the concepts into English — never copy Arabic text into the output
+- Do NOT ask about other subjects like math or science`,
+
+  social_studies: `- الأسئلة لازم تكون عن الدراسات الاجتماعية بس (تاريخ مصر، جغرافيا، المجتمع، المواطنة حسب المنهج المصري)
+- اكتب الأسئلة بالعامية المصرية البسيطة
+- ممنوع تسأل عن أي مادة تانية`,
+
+  religion: `- الأسئلة لازم تكون عن التربية الدينية بس (القيم، العبادات، القصص الدينية، الأخلاق حسب المنهج المصري)
+- اكتب الأسئلة بلغة بسيطة محترمة مناسبة للطفل
+- ممنوع تسأل عن أي مادة تانية`,
+
+  computer: `- الأسئلة لازم تكون عن الحاسب الآلي بس (أجزاء الكمبيوتر، الإنترنت، البرامج البسيطة، الاستخدام الآمن)
+- اكتب الأسئلة بالعامية المصرية البسيطة، والمصطلحات التقنية زي ما هي (mouse, keyboard, ...)
+- ممنوع تسأل عن أي مادة تانية`,
+
+  art: `- الأسئلة لازم تكون عن التربية الفنية بس (الألوان، الرسم، الأشكال، الخامات، الفنانين)
+- اكتب الأسئلة بالعامية المصرية البسيطة
+- ممنوع تسأل عن أي مادة تانية`,
+
+  other: `- الأسئلة لازم تكون مرتبطة مباشرة بالمحتوى اللي الطالب كتبه في الوصف أو الصور
+- اكتب الأسئلة بالعامية المصرية البسيطة
+- ممنوع تخرج عن الموضوع اللي ذاكره الطالب`,
+}
+
 export function buildGenerateQuestionsPrompt(
   subject: Subject,
   description: string,
@@ -7,6 +48,7 @@ export function buildGenerateQuestionsPrompt(
   hasImages: boolean = false
 ) {
   const subjectLabel = SUBJECT_LABELS[subject]
+  const subjectInstructions = SUBJECT_INSTRUCTIONS[subject]
 
   const imageSystemRules = hasImages
     ? `- الصور المرفقة هي المصدر الأساسي للأسئلة - لازم تحلل كل صورة بالتفصيل
@@ -32,7 +74,8 @@ export function buildGenerateQuestionsPrompt(
 - الأسئلة تكون مباشرة وواضحة - سؤال واحد بسيط في كل مرة
 - الاختيارات لازم تكون قصيرة ومفهومة وواضح الفرق بينها
 - خلي الإجابة الصحيحة واضحة للطالب اللي ذاكر - مش عايزين أسئلة خداعية
-- استخدم لغة عامية مصرية بسيطة ومرحة (مش فصحى جامدة)
+- ⚠️ قاعدة مهمة جداً: لازم كل الأسئلة تكون عن مادة "${subjectLabel}" فقط - ممنوع تماماً تسأل عن أي مادة تانية
+${subjectInstructions}
 ${imageSystemRules}
 - أجب دائماً بـ JSON فقط، بدون أي نص إضافي`,
     user: `الطالب في الصف: ${grade}
@@ -41,7 +84,10 @@ ${imageSystemRules}
 (مهم: اسأل أسئلة بسيطة وسهلة ومباشرة - الطالب لسه بيتعلم)
 ${hasImages ? '⚠️ مهم جداً: الصور المرفقة هي المرجع الأساسي - حللها كويس واسأل على اللي فيها بالتحديد' : ''}
 
-أنشئ 8 أسئلة اختيار من متعدد بالعامية المصرية:
+تعليمات خاصة بالمادة:
+${subjectInstructions}
+
+أنشئ 8 أسئلة اختيار من متعدد عن مادة "${subjectLabel}":
 - كل الأسئلة اختيار من متعدد (3 اختيارات واضحة ومختلفة)
 - الأسئلة تكون بسيطة ومباشرة وسهلة
 - ممنوع أسئلة خداعية أو معقدة أو فيها تفاصيل كتير
