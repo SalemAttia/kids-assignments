@@ -38,6 +38,26 @@ interface WeeklySummaryData {
 type PrayerKey = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha'
 interface PrayerLog { prayer_date: string; fajr: boolean; dhuhr: boolean; asr: boolean; maghrib: boolean; isha: boolean }
 
+interface AdherenceDay {
+  dayOfWeek: number
+  date: string
+  isToday: boolean
+  isPast: boolean
+  isFuture: boolean
+  scheduled: string[]
+  studied: string[]
+  missed: string[]
+  extras: string[]
+}
+
+interface AdherenceData {
+  weekStart: string
+  weekEnd: string
+  today: number
+  hasSchedule: boolean
+  days: AdherenceDay[]
+}
+
 function gradeLabel(grade: number) {
   const names: Record<number, string> = {
     1: 'الأول ابتدائي',   2: 'الثاني ابتدائي',  3: 'الثالث ابتدائي',
@@ -114,6 +134,7 @@ export default function ParentDashboard() {
   const [weeklySummaries, setWeeklySummaries] = useState<Record<string, WeeklySummaryData | null>>({})
   const [loadingSummary, setLoadingSummary] = useState<Record<string, boolean>>({})
   const [prayerLogs, setPrayerLogs] = useState<Record<string, PrayerLog[]>>({})
+  const [adherence, setAdherence] = useState<Record<string, AdherenceData>>({})
   const [loading, setLoading] = useState(true)
   const [selectedSession, setSelectedSession] = useState<SessionDetail | null>(null)
   const [modalLoading, setModalLoading] = useState(false)
@@ -195,12 +216,14 @@ export default function ParentDashboard() {
     const sessionsMap: Record<string, SessionWithReport[]> = {}
     const statsMap: Record<string, WeeklyStats> = {}
     const prayerMap: Record<string, PrayerLog[]> = {}
+    const adherenceMap: Record<string, AdherenceData> = {}
 
     await Promise.all(usersData.map(async (user) => {
-      const [sessRes, statsRes, prayerRes] = await Promise.all([
+      const [sessRes, statsRes, prayerRes, adhRes] = await Promise.all([
         fetch(`/api/reports/${user.id}`),
         fetch(`/api/reports/weekly/${user.id}`),
         fetch(`/api/prayers/${user.id}?days=7`),
+        fetch(`/api/schedule/adherence/${user.id}`),
       ])
       if (sessRes.ok) {
         const d = await sessRes.json()
@@ -213,11 +236,15 @@ export default function ParentDashboard() {
         const d = await prayerRes.json()
         prayerMap[user.id] = d.logs || []
       }
+      if (adhRes.ok) {
+        adherenceMap[user.id] = await adhRes.json()
+      }
     }))
 
     setSessions(sessionsMap)
     setWeeklyStats(statsMap)
     setPrayerLogs(prayerMap)
+    setAdherence(adherenceMap)
     setLoading(false)
   }
 
@@ -406,6 +433,171 @@ export default function ParentDashboard() {
                   <p className="text-teal-600 text-sm mt-3 text-center">لم يتم تسجيل أي صلوات اليوم بعد</p>
                 )}
               </div>
+
+              {/* Weekly Schedule Adherence */}
+              {(() => {
+                const adh = adherence[user.id]
+                if (!adh) return null
+                if (!adh.hasSchedule) {
+                  return (
+                    <div className="mb-6 bg-indigo-50 rounded-2xl p-5 border border-indigo-100">
+                      <h3 className="text-lg font-bold text-indigo-800 mb-2">📅 جدول المذاكرة الأسبوعي</h3>
+                      <p className="text-indigo-600 text-sm text-center">لسه مفيش جدول مذاكرة متحدد</p>
+                    </div>
+                  )
+                }
+
+                // Summary counters
+                const totalScheduled = adh.days.reduce((a, d) => a + d.scheduled.length, 0)
+                const totalDone = adh.days.reduce(
+                  (a, d) => a + d.scheduled.filter(s => d.studied.includes(s)).length,
+                  0,
+                )
+                const totalMissed = adh.days.reduce((a, d) => a + d.missed.length, 0)
+                const todayDay = adh.days.find(d => d.isToday) || null
+                const todayPending = todayDay
+                  ? todayDay.scheduled.filter(s => !todayDay.studied.includes(s))
+                  : []
+
+                // Subject chip — explicit label, not just emoji
+                type ChipStatus = 'done' | 'missed' | 'pending' | 'upcoming' | 'extra'
+                const chipClass: Record<ChipStatus, string> = {
+                  done:     'bg-emerald-100 text-emerald-800 border-emerald-300',
+                  missed:   'bg-red-100 text-red-800 border-red-300 line-through',
+                  pending:  'bg-slate-100 text-slate-700 border-slate-300',
+                  upcoming: 'bg-white text-slate-400 border-slate-200',
+                  extra:    'bg-amber-100 text-amber-800 border-amber-300',
+                }
+                const chipIcon: Record<ChipStatus, string> = {
+                  done: '✓', missed: '✗', pending: '⏳', upcoming: '·', extra: '+',
+                }
+                const renderChip = (subj: string, status: ChipStatus, keyPrefix = '') => (
+                  <span
+                    key={`${keyPrefix}${subj}-${status}`}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${chipClass[status]}`}
+                  >
+                    <span className="text-[11px] font-bold">{chipIcon[status]}</span>
+                    <span>{SUBJECT_EMOJIS[subj] ?? '📚'}</span>
+                    <span>{SUBJECT_LABELS[subj as Subject] || subj}</span>
+                  </span>
+                )
+
+                return (
+                  <div className="mb-6 bg-indigo-50 rounded-2xl p-5 border border-indigo-100">
+                    <h3 className="text-lg font-bold text-indigo-800 mb-4">📅 جدول المذاكرة الأسبوعي</h3>
+
+                    {/* Summary cards */}
+                    <div className="grid grid-cols-3 gap-3 mb-5">
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                        <div className="text-2xl mb-0.5">✅</div>
+                        <div className="text-2xl font-black text-emerald-700 leading-none">
+                          {totalDone}
+                          <span className="text-sm font-bold text-emerald-500">/{totalScheduled}</span>
+                        </div>
+                        <div className="text-[11px] text-emerald-700 mt-1 font-semibold">اتذاكر</div>
+                      </div>
+                      <div className={`rounded-xl p-3 text-center border ${totalMissed > 0 ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className="text-2xl mb-0.5">{totalMissed > 0 ? '❌' : '🎉'}</div>
+                        <div className={`text-2xl font-black leading-none ${totalMissed > 0 ? 'text-red-700' : 'text-slate-400'}`}>
+                          {totalMissed}
+                        </div>
+                        <div className={`text-[11px] mt-1 font-semibold ${totalMissed > 0 ? 'text-red-700' : 'text-slate-500'}`}>فات</div>
+                      </div>
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                        <div className="text-2xl mb-0.5">⏳</div>
+                        <div className="text-2xl font-black text-amber-700 leading-none">
+                          {todayDay && todayDay.scheduled.length > 0 ? (
+                            <>
+                              {todayPending.length}
+                              <span className="text-sm font-bold text-amber-500">/{todayDay.scheduled.length}</span>
+                            </>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-amber-700 mt-1 font-semibold">النهاردة لسه</div>
+                      </div>
+                    </div>
+
+                    {/* Per-day list */}
+                    <div className="space-y-2">
+                      {adh.days.map(day => {
+                        const d = new Date(day.date)
+                        const dateLabel = d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })
+                        const doneSubjects = day.scheduled.filter(s => day.studied.includes(s))
+                        const missedSubjects = day.missed
+                        const pendingSubjects = day.isToday
+                          ? day.scheduled.filter(s => !day.studied.includes(s))
+                          : []
+
+                        // Row background + status badge
+                        let rowTone = 'bg-white border-slate-100'
+                        let badge: { text: string; className: string } | null = null
+                        if (day.isToday) {
+                          rowTone = 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200'
+                          badge = { text: 'النهاردة', className: 'bg-indigo-500 text-white' }
+                        } else if (day.isFuture) {
+                          rowTone = 'bg-white/60 border-slate-100'
+                          badge = { text: 'قادم', className: 'bg-slate-200 text-slate-600' }
+                        } else if (missedSubjects.length > 0) {
+                          rowTone = 'bg-red-50 border-red-200'
+                          badge = { text: 'فات', className: 'bg-red-500 text-white' }
+                        } else if (day.scheduled.length === 0 && day.extras.length === 0) {
+                          rowTone = 'bg-slate-50 border-slate-100'
+                          badge = { text: 'إجازة', className: 'bg-slate-200 text-slate-500' }
+                        } else {
+                          rowTone = 'bg-emerald-50 border-emerald-200'
+                          badge = { text: 'تم', className: 'bg-emerald-500 text-white' }
+                        }
+
+                        return (
+                          <div key={day.date} className={`rounded-xl p-3 border ${rowTone}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`font-bold text-sm ${day.isToday ? 'text-indigo-900' : 'text-slate-700'}`}>
+                                  {DAY_LABELS[day.dayOfWeek]}
+                                </span>
+                                <span className="text-xs text-slate-400">{dateLabel}</span>
+                              </div>
+                              {badge && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.className}`}>
+                                  {badge.text}
+                                </span>
+                              )}
+                            </div>
+
+                            {day.scheduled.length === 0 && day.extras.length === 0 ? (
+                              <p className="text-xs text-slate-400 text-center py-1">مفيش مذاكرة مجدولة</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {day.isFuture
+                                  ? day.scheduled.map(s => renderChip(s, 'upcoming'))
+                                  : (
+                                    <>
+                                      {doneSubjects.map(s => renderChip(s, 'done'))}
+                                      {missedSubjects.map(s => renderChip(s, 'missed'))}
+                                      {pendingSubjects.map(s => renderChip(s, 'pending'))}
+                                      {day.extras.map(s => renderChip(s, 'extra', 'ex-'))}
+                                    </>
+                                  )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Legend */}
+                    <div className="mt-4 pt-3 border-t border-indigo-100 flex flex-wrap gap-2 text-[11px] text-slate-600 justify-center">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 font-semibold">✓ اتذاكر</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 border border-red-300 text-red-800 font-semibold">✗ فات</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-slate-700 font-semibold">⏳ لسه النهاردة</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-400 font-semibold">· قادم</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-800 font-semibold">+ إضافي</span>
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Weekly Stats */}
               {stats && (
