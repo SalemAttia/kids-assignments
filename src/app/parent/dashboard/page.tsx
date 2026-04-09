@@ -38,6 +38,26 @@ interface WeeklySummaryData {
 type PrayerKey = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha'
 interface PrayerLog { prayer_date: string; fajr: boolean; dhuhr: boolean; asr: boolean; maghrib: boolean; isha: boolean }
 
+interface AdherenceDay {
+  dayOfWeek: number
+  date: string
+  isToday: boolean
+  isPast: boolean
+  isFuture: boolean
+  scheduled: string[]
+  studied: string[]
+  missed: string[]
+  extras: string[]
+}
+
+interface AdherenceData {
+  weekStart: string
+  weekEnd: string
+  today: number
+  hasSchedule: boolean
+  days: AdherenceDay[]
+}
+
 function gradeLabel(grade: number) {
   const names: Record<number, string> = {
     1: 'الأول ابتدائي',   2: 'الثاني ابتدائي',  3: 'الثالث ابتدائي',
@@ -114,6 +134,7 @@ export default function ParentDashboard() {
   const [weeklySummaries, setWeeklySummaries] = useState<Record<string, WeeklySummaryData | null>>({})
   const [loadingSummary, setLoadingSummary] = useState<Record<string, boolean>>({})
   const [prayerLogs, setPrayerLogs] = useState<Record<string, PrayerLog[]>>({})
+  const [adherence, setAdherence] = useState<Record<string, AdherenceData>>({})
   const [loading, setLoading] = useState(true)
   const [selectedSession, setSelectedSession] = useState<SessionDetail | null>(null)
   const [modalLoading, setModalLoading] = useState(false)
@@ -172,12 +193,14 @@ export default function ParentDashboard() {
     const sessionsMap: Record<string, SessionWithReport[]> = {}
     const statsMap: Record<string, WeeklyStats> = {}
     const prayerMap: Record<string, PrayerLog[]> = {}
+    const adherenceMap: Record<string, AdherenceData> = {}
 
     await Promise.all(usersData.map(async (user) => {
-      const [sessRes, statsRes, prayerRes] = await Promise.all([
+      const [sessRes, statsRes, prayerRes, adhRes] = await Promise.all([
         fetch(`/api/reports/${user.id}`),
         fetch(`/api/reports/weekly/${user.id}`),
         fetch(`/api/prayers/${user.id}?days=7`),
+        fetch(`/api/schedule/adherence/${user.id}`),
       ])
       if (sessRes.ok) {
         const d = await sessRes.json()
@@ -190,11 +213,15 @@ export default function ParentDashboard() {
         const d = await prayerRes.json()
         prayerMap[user.id] = d.logs || []
       }
+      if (adhRes.ok) {
+        adherenceMap[user.id] = await adhRes.json()
+      }
     }))
 
     setSessions(sessionsMap)
     setWeeklyStats(statsMap)
     setPrayerLogs(prayerMap)
+    setAdherence(adherenceMap)
     setLoading(false)
   }
 
@@ -354,6 +381,124 @@ export default function ParentDashboard() {
                   <p className="text-teal-600 text-sm mt-3 text-center">لم يتم تسجيل أي صلوات اليوم بعد</p>
                 )}
               </div>
+
+              {/* Weekly Schedule Adherence */}
+              {(() => {
+                const adh = adherence[user.id]
+                if (!adh) return null
+                if (!adh.hasSchedule) {
+                  return (
+                    <div className="mb-6 bg-indigo-50 rounded-2xl p-5 border border-indigo-100">
+                      <h3 className="text-lg font-bold text-indigo-800 mb-2">📅 جدول المذاكرة الأسبوعي</h3>
+                      <p className="text-indigo-600 text-sm text-center">لسه مفيش جدول مذاكرة متحدد</p>
+                    </div>
+                  )
+                }
+                const totalScheduled = adh.days.reduce((a, d) => a + d.scheduled.length, 0)
+                const totalMissed = adh.days.reduce((a, d) => a + d.missed.length, 0)
+                const totalDone = adh.days.reduce(
+                  (a, d) => a + d.scheduled.filter(s => d.studied.includes(s)).length,
+                  0,
+                )
+
+                return (
+                  <div className="mb-6 bg-indigo-50 rounded-2xl p-5 border border-indigo-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold text-indigo-800">📅 جدول المذاكرة الأسبوعي</h3>
+                      <div className="flex gap-3 text-sm">
+                        <span className="bg-indigo-100 text-indigo-700 font-bold px-3 py-1 rounded-lg">
+                          تم: {totalDone}/{totalScheduled}
+                        </span>
+                        {totalMissed > 0 && (
+                          <span className="bg-red-100 text-red-700 font-bold px-3 py-1 rounded-lg">
+                            فات: {totalMissed}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-2">
+                      {adh.days.map(day => {
+                        const d = new Date(day.date)
+                        const tone =
+                          day.isFuture
+                            ? 'bg-white/60 border border-slate-100'
+                            : day.missed.length > 0
+                            ? 'bg-red-50 border border-red-200'
+                            : day.scheduled.length === 0
+                            ? 'bg-slate-50 border border-slate-100'
+                            : 'bg-emerald-50 border border-emerald-200'
+                        return (
+                          <div
+                            key={day.date}
+                            className={`rounded-xl p-2 min-h-[90px] flex flex-col gap-1 text-xs ${tone} ${day.isToday ? 'ring-2 ring-indigo-400' : ''}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className={`font-bold ${day.isToday ? 'text-indigo-700' : 'text-slate-500'}`}>
+                                {DAY_LABELS[day.dayOfWeek].slice(0, 3)}
+                              </span>
+                              <span className="text-[10px] text-slate-400">{d.getDate()}</span>
+                            </div>
+                            {day.scheduled.length === 0 ? (
+                              <span className="text-[10px] text-slate-300 mt-auto">—</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {day.scheduled.map(subj => {
+                                  const wasStudied = day.studied.includes(subj)
+                                  const isMissed = day.missed.includes(subj)
+                                  return (
+                                    <span
+                                      key={subj}
+                                      title={SUBJECT_LABELS[subj as Subject] || subj}
+                                      className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-sm ${
+                                        wasStudied
+                                          ? 'bg-emerald-500 text-white'
+                                          : isMissed
+                                          ? 'bg-red-200 text-red-700 line-through'
+                                          : 'bg-slate-200 text-slate-500'
+                                      }`}
+                                    >
+                                      {SUBJECT_EMOJIS[subj] ?? '📚'}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            )}
+                            {day.extras.length > 0 && (
+                              <div className="mt-auto flex flex-wrap gap-1 pt-1 border-t border-slate-100">
+                                {day.extras.map(subj => (
+                                  <span
+                                    key={`x-${subj}`}
+                                    title={`إضافي: ${SUBJECT_LABELS[subj as Subject] || subj}`}
+                                    className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] bg-amber-100 text-amber-700"
+                                  >
+                                    {SUBJECT_EMOJIS[subj] ?? '➕'}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-3 text-[11px] text-slate-500 justify-center">
+                      <span className="flex items-center gap-1">
+                        <span className="w-3 h-3 rounded bg-emerald-500 inline-block" /> تم
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-3 h-3 rounded bg-red-200 inline-block" /> فات
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-3 h-3 rounded bg-slate-200 inline-block" /> النهاردة / قادم
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-3 h-3 rounded bg-amber-100 inline-block" /> إضافي
+                      </span>
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Weekly Stats */}
               {stats && (
