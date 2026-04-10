@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { openai, OPENAI_MODEL } from '@/lib/openai/client'
+import { openai, getModelForRole } from '@/lib/openai/client'
+import { isOSeriesModel } from '@/lib/openai/models'
 import { buildEvaluateAnswersPrompt } from '@/lib/openai/prompts'
 import { EvaluationSchema, parseJSON } from '@/lib/openai/parser'
 import { calculatePoints, calculateNewStreak } from '@/lib/utils/gamification'
@@ -56,13 +57,14 @@ export async function POST(req: NextRequest) {
       questionsAndAnswers
     )
 
+    const model = await getModelForRole('reasoning')
     const completion = await openai.chat.completions.create({
-      model: OPENAI_MODEL,
+      model,
       messages: [
         { role: 'system', content: prompt.system },
         { role: 'user', content: prompt.user },
       ],
-      response_format: { type: 'json_object' },
+      ...(isOSeriesModel(model) ? {} : { response_format: { type: 'json_object' } }),
     })
 
     const raw = completion.choices[0].message.content || '{}'

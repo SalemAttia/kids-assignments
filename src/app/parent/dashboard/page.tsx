@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { SUBJECT_LABELS, QUIZ_DIFFICULTY_LABELS } from '@/types'
+import { MODEL_OPTIONS, DEFAULT_MODELS } from '@/lib/openai/models'
 import type { User, Subject, QuizDifficulty } from '@/types'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -142,6 +143,43 @@ export default function ParentDashboard() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [savingDifficulty, setSavingDifficulty] = useState<Record<string, boolean>>({})
+  const [aiSettings, setAiSettings] = useState({ reasoning_model: 'gpt-4.1', fast_model: 'gpt-4.1-mini' })
+  const [savingAiSettings, setSavingAiSettings] = useState(false)
+
+  async function updateAiModel(field: 'reasoning_model' | 'fast_model', value: string) {
+    const prev = { ...aiSettings }
+    setAiSettings(s => ({ ...s, [field]: value }))
+    setSavingAiSettings(true)
+    try {
+      const res = await fetch('/api/ai-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      })
+      if (!res.ok) setAiSettings(prev)
+    } catch {
+      setAiSettings(prev)
+    }
+    setSavingAiSettings(false)
+  }
+
+  async function restoreDefaultModels() {
+    const defaults = { reasoning_model: DEFAULT_MODELS.reasoning, fast_model: DEFAULT_MODELS.fast }
+    const prev = { ...aiSettings }
+    setAiSettings(defaults)
+    setSavingAiSettings(true)
+    try {
+      const res = await fetch('/api/ai-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(defaults),
+      })
+      if (!res.ok) setAiSettings(prev)
+    } catch {
+      setAiSettings(prev)
+    }
+    setSavingAiSettings(false)
+  }
 
   async function updateDifficulty(userId: string, difficulty: QuizDifficulty) {
     setSavingDifficulty(prev => ({ ...prev, [userId]: true }))
@@ -209,6 +247,15 @@ export default function ParentDashboard() {
   }, [router])
 
   async function loadData() {
+    // Load AI settings
+    try {
+      const aiRes = await fetch('/api/ai-settings')
+      if (aiRes.ok) {
+        const aiData = await aiRes.json()
+        setAiSettings(aiData)
+      }
+    } catch { /* use defaults */ }
+
     const { data: usersData } = await createClient().from('users').select('*')
     if (!usersData) { setLoading(false); return }
     setUsers(usersData)
@@ -279,6 +326,61 @@ export default function ParentDashboard() {
           >
             اخرج
           </button>
+        </div>
+
+        {/* AI Model Settings - Global */}
+        <div className="bg-purple-50 rounded-2xl p-6 border border-purple-100 shadow-sm mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-purple-800">🤖 إعدادات الذكاء الاصطناعي</h3>
+              <p className="text-sm text-purple-500 mt-0.5">اختار النموذج اللي هيشتغل في كل دور. التغييرات بتتطبق فوراً.</p>
+            </div>
+            <button
+              onClick={restoreDefaultModels}
+              disabled={savingAiSettings}
+              className="text-xs text-purple-500 hover:text-purple-700 underline disabled:opacity-50"
+            >
+              استعادة الافتراضي
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Reasoning Model */}
+            <div>
+              <label className="block text-sm font-bold text-purple-700 mb-1">
+                🧠 نموذج التفكير
+              </label>
+              <p className="text-xs text-purple-400 mb-2">الأسئلة، التقييم، التقارير الأسبوعية</p>
+              <select
+                value={aiSettings.reasoning_model}
+                onChange={e => updateAiModel('reasoning_model', e.target.value)}
+                disabled={savingAiSettings}
+                className="w-full bg-white border border-purple-200 rounded-xl px-4 py-2.5 text-sm text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:opacity-50"
+              >
+                {MODEL_OPTIONS.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Fast Model */}
+            <div>
+              <label className="block text-sm font-bold text-purple-700 mb-1">
+                ⚡ نموذج سريع
+              </label>
+              <p className="text-xs text-purple-400 mb-2">شرح المفاهيم والمساعدة السريعة</p>
+              <select
+                value={aiSettings.fast_model}
+                onChange={e => updateAiModel('fast_model', e.target.value)}
+                disabled={savingAiSettings}
+                className="w-full bg-white border border-purple-200 rounded-xl px-4 py-2.5 text-sm text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:opacity-50"
+              >
+                {MODEL_OPTIONS.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         {users.map(user => {
