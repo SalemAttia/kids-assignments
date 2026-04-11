@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOpenAI, OPENAI_MODEL } from '@/lib/openai/client'
+import { getOpenAI, getModelForRole } from '@/lib/openai/client'
 import { SUBJECT_LABELS } from '@/types'
 import type { Subject } from '@/types'
 
@@ -53,8 +53,9 @@ ${images.length > 0 ? `الصور المرفقة (${images.length} صورة) ت�
 اشرح لي بطريقة بسيطة جداً كأنك تشرح لطفل صغير، استخدم أمثلة من الحياة اليومية، وكن ودوداً ومشجعاً.`,
     })
 
+    const model = await getModelForRole('fast')
     const response = await openai.chat.completions.create({
-      model: OPENAI_MODEL,
+      model,
       messages: [
         {
           role: 'system',
