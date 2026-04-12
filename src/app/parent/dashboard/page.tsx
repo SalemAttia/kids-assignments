@@ -4,7 +4,10 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { SUBJECT_LABELS, QUIZ_DIFFICULTY_LABELS, CHECKIN_MOOD_LABELS } from '@/types'
 import { MODEL_OPTIONS, DEFAULT_MODELS } from '@/lib/openai/models'
-import type { User, Subject, QuizDifficulty, Checkin, CheckinMood } from '@/types'
+import type {
+  User, Subject, QuizDifficulty, Checkin, CheckinMood,
+  CheckinEnergy, CheckinSleep, CheckinSubjectDifficulty, CheckinSubjectEnjoyment,
+} from '@/types'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend
@@ -119,6 +122,30 @@ const SCORE_GRADIENT: Record<string, string> = {
   low: 'from-red-400 to-rose-500',
 }
 
+const CHECKIN_ENERGY_LABELS: Record<CheckinEnergy, { emoji: string; label: string }> = {
+  high:   { emoji: '⚡⚡⚡', label: 'عالية' },
+  medium: { emoji: '⚡⚡',   label: 'متوسطة' },
+  low:    { emoji: '⚡',     label: 'قليلة' },
+}
+
+const CHECKIN_SLEEP_LABELS: Record<CheckinSleep, { emoji: string; label: string }> = {
+  good: { emoji: '😴', label: 'نام كويس' },
+  okay: { emoji: '🙂', label: 'شوية'     },
+  bad:  { emoji: '😫', label: 'مش كويس'   },
+}
+
+const CHECKIN_DIFFICULTY_LABELS: Record<CheckinSubjectDifficulty, { emoji: string; label: string; color: string }> = {
+  easy:   { emoji: '🟢', label: 'سهلة',   color: 'bg-green-50 text-green-700 border-green-200'   },
+  medium: { emoji: '🟡', label: 'متوسطة', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+  hard:   { emoji: '🔴', label: 'صعبة',   color: 'bg-red-50 text-red-700 border-red-200'          },
+}
+
+const CHECKIN_ENJOYMENT_LABELS: Record<CheckinSubjectEnjoyment, { emoji: string; label: string }> = {
+  like:    { emoji: '👍', label: 'عجبته'  },
+  meh:     { emoji: '😐', label: 'عادي'    },
+  dislike: { emoji: '👎', label: 'مش عاجباه' },
+}
+
 function getPastDays(n: number): string[] {
   return Array.from({ length: n }, (_, i) => {
     const d = new Date()
@@ -146,6 +173,10 @@ export default function ParentDashboard() {
   const [savingDifficulty, setSavingDifficulty] = useState<Record<string, boolean>>({})
   const [aiSettings, setAiSettings] = useState({ reasoning_model: 'gpt-4.1', fast_model: 'gpt-4.1-mini' })
   const [savingAiSettings, setSavingAiSettings] = useState(false)
+  const [selectedCheckin, setSelectedCheckin] = useState<Checkin | null>(null)
+  const [checkinListUser, setCheckinListUser] = useState<User | null>(null)
+  const [checkinListData, setCheckinListData] = useState<Checkin[]>([])
+  const [checkinListLoading, setCheckinListLoading] = useState(false)
 
   async function updateAiModel(field: 'reasoning_model' | 'fast_model', value: string) {
     const prev = { ...aiSettings }
@@ -223,6 +254,35 @@ export default function ParentDashboard() {
     setLightboxUrl(null)
     setShowDeleteConfirm(false)
     setDeleting(false)
+  }
+
+  async function openCheckinList(user: User) {
+    setCheckinListUser(user)
+    setCheckinListLoading(true)
+    // Start with whatever we already have cached so the list feels instant
+    setCheckinListData(checkins[user.id] || [])
+    try {
+      const res = await fetch(`/api/checkins/${user.id}?limit=365`)
+      if (res.ok) {
+        const d = await res.json()
+        setCheckinListData(d.checkins || [])
+      }
+    } catch { /* keep cached */ }
+    setCheckinListLoading(false)
+  }
+
+  function closeCheckinList() {
+    setCheckinListUser(null)
+    setCheckinListData([])
+    setCheckinListLoading(false)
+  }
+
+  function openCheckinDetail(c: Checkin) {
+    setSelectedCheckin(c)
+  }
+
+  function closeCheckinDetail() {
+    setSelectedCheckin(null)
   }
 
   async function handleDeleteSession(sessionId: string) {
@@ -601,14 +661,26 @@ export default function ParentDashboard() {
 
                 return (
                   <div className="mb-6 bg-violet-50 rounded-2xl p-5 border border-violet-100">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
                       <h3 className="text-lg font-bold text-violet-800">💙 التشيك-إن اليومي</h3>
-                      {today?.mood && (
-                        <span className="bg-violet-100 text-violet-700 font-bold px-3 py-1 rounded-lg text-sm flex items-center gap-1">
-                          <span className="text-lg">{CHECKIN_MOOD_LABELS[today.mood].emoji}</span>
-                          <span>{CHECKIN_MOOD_LABELS[today.mood].label}</span>
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {today?.mood && (
+                          <button
+                            onClick={() => openCheckinDetail(today)}
+                            className="bg-violet-100 hover:bg-violet-200 text-violet-700 font-bold px-3 py-1 rounded-lg text-sm flex items-center gap-1 transition-colors"
+                            title="شوف تفاصيل تشيك-إن اليوم"
+                          >
+                            <span className="text-lg">{CHECKIN_MOOD_LABELS[today.mood].emoji}</span>
+                            <span>{CHECKIN_MOOD_LABELS[today.mood].label}</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => openCheckinList(user)}
+                          className="text-xs font-bold text-violet-700 bg-white hover:bg-violet-100 border border-violet-200 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          📋 شوف كل التشيك-إن
+                        </button>
+                      </div>
                     </div>
 
                     {/* Mood trend sparkline */}
@@ -663,10 +735,14 @@ export default function ParentDashboard() {
                       <div className="bg-amber-50 rounded-xl p-3 mb-3 border border-amber-200">
                         <p className="text-xs font-bold text-amber-800 mb-2">💭 في حاجة مضايقاه</p>
                         {recentBothered.map(c => (
-                          <div key={c.id} className="text-sm text-amber-800 mb-1">
+                          <button
+                            key={c.id}
+                            onClick={() => openCheckinDetail(c)}
+                            className="block w-full text-right text-sm text-amber-800 mb-1 hover:bg-amber-100 rounded-lg px-2 py-1 transition-colors"
+                          >
                             <span className="text-xs text-amber-600">{new Date(c.checkin_date).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' })}: </span>
                             {c.bothered_note || '(بدون تفاصيل)'}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -677,23 +753,26 @@ export default function ParentDashboard() {
                         <p className="text-xs font-bold text-slate-600 mb-2">📝 آخر أصعب حاجة قالها</p>
                         <div className="space-y-2">
                           {struggles.map(c => (
-                            <div key={c.id} className="flex gap-2 items-start text-sm text-slate-700 border-r-2 border-violet-300 pr-2">
-                              <span className="text-[11px] text-slate-400 flex-shrink-0 whitespace-nowrap">
+                            <button
+                              key={c.id}
+                              onClick={() => openCheckinDetail(c)}
+                              className="w-full text-right flex gap-2 items-start text-sm text-slate-700 border-r-2 border-violet-300 pr-2 hover:bg-violet-50 rounded-lg py-1 transition-colors"
+                            >
+                              <span className="text-[11px] text-slate-400 flex-shrink-0 whitespace-nowrap pt-0.5">
                                 {new Date(c.checkin_date).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' })}
                               </span>
                               <div className="flex-1">
                                 <p className="leading-snug">{c.hardest_thing}</p>
                                 {c.struggle_image_url && (
-                                  <button
-                                    onClick={() => setLightboxUrl(c.struggle_image_url)}
-                                    className="mt-1 inline-block"
-                                  >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={c.struggle_image_url} alt="صورة" className="h-16 rounded-lg border border-slate-200 hover:opacity-80 transition-opacity" />
-                                  </button>
+                                  /* eslint-disable-next-line @next/next/no-img-element */
+                                  <img
+                                    src={c.struggle_image_url}
+                                    alt="صورة"
+                                    className="mt-1 h-16 rounded-lg border border-slate-200"
+                                  />
                                 )}
                               </div>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -1188,6 +1267,286 @@ export default function ParentDashboard() {
               >
                 لا، ارجع
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Check-in List Modal */}
+      {checkinListUser && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={closeCheckinList}
+        >
+          <div
+            className="bg-gradient-to-br from-violet-50 via-blue-50 to-pink-50 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+            dir="rtl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white/90 backdrop-blur-sm border-b border-violet-100 p-4 flex items-center justify-between z-10">
+              <div>
+                <h2 className="text-lg font-bold text-violet-800">💙 تشيك-إن {checkinListUser.name}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {checkinListLoading ? 'بيتحمل...' : `${checkinListData.length} يوم`}
+                </p>
+              </div>
+              <button
+                onClick={closeCheckinList}
+                className="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-500 text-sm transition-colors"
+              >✕</button>
+            </div>
+            <div className="p-4 space-y-2">
+              {checkinListData.length === 0 && !checkinListLoading && (
+                <div className="text-center py-12 text-slate-400">
+                  <div className="text-4xl mb-2">💙</div>
+                  <p className="text-sm">ما فيش تشيك-إن لسه</p>
+                </div>
+              )}
+              {checkinListData.map(c => {
+                const moodInfo = c.mood ? CHECKIN_MOOD_LABELS[c.mood] : null
+                const subjectCount = (c.subjects_studied || []).length
+                const hasStruggle = c.hardest_thing && c.hardest_thing.trim().length > 0
+                const isToday = c.checkin_date === new Date().toISOString().split('T')[0]
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => openCheckinDetail(c)}
+                    className="w-full text-right bg-white rounded-xl p-3 shadow-sm hover:shadow-md hover:bg-violet-50/50 transition-all border border-violet-100 flex items-center gap-3"
+                  >
+                    <span className="text-3xl flex-shrink-0">{moodInfo?.emoji ?? '💙'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-slate-700">
+                          {new Date(c.checkin_date).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        </span>
+                        {isToday && (
+                          <span className="text-[10px] bg-violet-100 text-violet-600 font-bold px-1.5 py-0.5 rounded">اليوم</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {moodInfo && (
+                          <span className="text-[11px] text-slate-500">{moodInfo.label}</span>
+                        )}
+                        {subjectCount > 0 && (
+                          <span className="text-[11px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                            📚 {subjectCount} مادة
+                          </span>
+                        )}
+                        {hasStruggle && (
+                          <span className="text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                            📝 صعوبة
+                          </span>
+                        )}
+                        {c.bothered && (
+                          <span className="text-[11px] text-red-700 bg-red-50 px-1.5 py-0.5 rounded">
+                            💭 مضايق
+                          </span>
+                        )}
+                        {c.struggle_image_url && (
+                          <span className="text-[11px] text-slate-500">📷</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-slate-300 text-lg flex-shrink-0">‹</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Check-in Detail Modal */}
+      {selectedCheckin && (
+        <div
+          className="fixed inset-0 z-[55] bg-black/60 flex items-center justify-center p-4"
+          onClick={closeCheckinDetail}
+        >
+          <div
+            className="bg-gradient-to-br from-violet-50 via-blue-50 to-pink-50 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+            dir="rtl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white/90 backdrop-blur-sm border-b border-violet-100 p-4 flex items-center justify-between z-10">
+              <div>
+                <h2 className="text-lg font-bold text-violet-800">💙 تفاصيل التشيك-إن</h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {new Date(selectedCheckin.checkin_date).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+              <button
+                onClick={closeCheckinDetail}
+                className="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-500 text-sm transition-colors"
+              >✕</button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Section 1 — Feelings */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-violet-100">
+                <h3 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wide">الإحساس</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-violet-50 rounded-xl p-3 text-center">
+                    <div className="text-2xl mb-1">{selectedCheckin.mood ? CHECKIN_MOOD_LABELS[selectedCheckin.mood].emoji : '—'}</div>
+                    <div className="text-[10px] text-slate-400 font-semibold">المزاج</div>
+                    <div className="text-xs font-bold text-violet-700 mt-0.5">
+                      {selectedCheckin.mood ? CHECKIN_MOOD_LABELS[selectedCheckin.mood].label : '—'}
+                    </div>
+                  </div>
+                  <div className="bg-yellow-50 rounded-xl p-3 text-center">
+                    <div className="text-lg mb-1">{selectedCheckin.energy ? CHECKIN_ENERGY_LABELS[selectedCheckin.energy].emoji : '—'}</div>
+                    <div className="text-[10px] text-slate-400 font-semibold">الطاقة</div>
+                    <div className="text-xs font-bold text-yellow-700 mt-0.5">
+                      {selectedCheckin.energy ? CHECKIN_ENERGY_LABELS[selectedCheckin.energy].label : '—'}
+                    </div>
+                  </div>
+                  <div className="bg-blue-50 rounded-xl p-3 text-center">
+                    <div className="text-2xl mb-1">{selectedCheckin.sleep ? CHECKIN_SLEEP_LABELS[selectedCheckin.sleep].emoji : '—'}</div>
+                    <div className="text-[10px] text-slate-400 font-semibold">النوم</div>
+                    <div className="text-xs font-bold text-blue-700 mt-0.5">
+                      {selectedCheckin.sleep ? CHECKIN_SLEEP_LABELS[selectedCheckin.sleep].label : '—'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2 — Subjects studied */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-violet-100">
+                <h3 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wide">
+                  📚 المواد اللي ذاكرها ({(selectedCheckin.subjects_studied || []).length})
+                </h3>
+                {(selectedCheckin.subjects_studied || []).length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-3">ما ذاكرش حاجة النهاردة</p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedCheckin.subjects_studied.map((ss, i) => (
+                      <div key={i} className="border border-slate-100 rounded-xl p-3 bg-slate-50/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xl">{SUBJECT_EMOJIS[ss.subject] ?? '📚'}</span>
+                          <span className="font-bold text-slate-700 text-sm">
+                            {SUBJECT_LABELS[ss.subject] || ss.subject}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className={`rounded-lg px-2 py-1.5 text-center border ${CHECKIN_DIFFICULTY_LABELS[ss.difficulty].color}`}>
+                            <div className="text-[9px] font-semibold opacity-70">صعوبة</div>
+                            <div className="text-xs font-bold flex items-center justify-center gap-1">
+                              <span>{CHECKIN_DIFFICULTY_LABELS[ss.difficulty].emoji}</span>
+                              <span>{CHECKIN_DIFFICULTY_LABELS[ss.difficulty].label}</span>
+                            </div>
+                          </div>
+                          <div className="rounded-lg px-2 py-1.5 text-center border border-amber-200 bg-amber-50">
+                            <div className="text-[9px] font-semibold text-amber-700 opacity-70">فهم</div>
+                            <div className="text-xs font-bold text-amber-700">
+                              {'⭐'.repeat(ss.confidence)}{'☆'.repeat(5 - ss.confidence)}
+                            </div>
+                          </div>
+                          <div className="rounded-lg px-2 py-1.5 text-center border border-green-200 bg-green-50">
+                            <div className="text-[9px] font-semibold text-green-700 opacity-70">متعة</div>
+                            <div className="text-xs font-bold text-green-700 flex items-center justify-center gap-1">
+                              <span>{CHECKIN_ENJOYMENT_LABELS[ss.enjoyment].emoji}</span>
+                              <span>{CHECKIN_ENJOYMENT_LABELS[ss.enjoyment].label}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Section 3 — Hardest thing */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-violet-100">
+                <h3 className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">🤔 أصعب حاجة النهاردة</h3>
+                {selectedCheckin.hardest_thing || selectedCheckin.struggle_image_url ? (
+                  <>
+                    {selectedCheckin.hardest_thing && (
+                      <p className="text-sm text-slate-700 leading-relaxed bg-amber-50 border border-amber-100 rounded-xl p-3">
+                        {selectedCheckin.hardest_thing}
+                      </p>
+                    )}
+                    {selectedCheckin.struggle_image_url && (
+                      <button
+                        onClick={() => setLightboxUrl(selectedCheckin.struggle_image_url)}
+                        className="mt-2 block"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={selectedCheckin.struggle_image_url}
+                          alt="صورة الصعوبة"
+                          className="max-h-48 rounded-xl border border-slate-200 hover:opacity-80 transition-opacity"
+                        />
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">ما قالش حاجة صعبة</p>
+                )}
+              </div>
+
+              {/* Section 4 — Best thing + bothered */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-violet-100 space-y-3">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">✨ أحسن حاجة النهاردة</h3>
+                  {selectedCheckin.best_thing ? (
+                    <p className="text-sm text-slate-700 leading-relaxed bg-green-50 border border-green-100 rounded-xl p-3">
+                      {selectedCheckin.best_thing}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-slate-400 italic">ما قالش</p>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">💭 حاجة مضايقاه؟</h3>
+                  {selectedCheckin.bothered ? (
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+                      <p className="text-sm font-bold text-red-700 mb-1">😕 أه، في حاجة</p>
+                      {selectedCheckin.bothered_note ? (
+                        <p className="text-sm text-red-600 leading-relaxed">{selectedCheckin.bothered_note}</p>
+                      ) : (
+                        <p className="text-xs text-red-500 italic">ما كتبش تفاصيل</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-green-600 bg-green-50 border border-green-100 rounded-xl p-3">🙂 لا، كله تمام</p>
+                  )}
+                </div>
+              </div>
+
+              {/* AI analysis */}
+              {selectedCheckin.ai_flags && (
+                <div className="bg-violet-100/60 rounded-2xl p-4 border border-violet-200">
+                  <h3 className="text-xs font-bold text-violet-700 mb-2 uppercase tracking-wide">🤖 تحليل الذكاء الاصطناعي</h3>
+                  {selectedCheckin.ai_flags.summary && (
+                    <p className="text-sm text-violet-800 italic mb-2">{selectedCheckin.ai_flags.summary}</p>
+                  )}
+                  {selectedCheckin.ai_flags.red_flags && selectedCheckin.ai_flags.red_flags.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-[10px] font-bold text-red-700 uppercase mb-1">🚨 إشارات انتباه</p>
+                      <ul className="space-y-0.5">
+                        {selectedCheckin.ai_flags.red_flags.map((f, i) => (
+                          <li key={i} className="text-xs text-red-700">• {f}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {selectedCheckin.ai_flags.themes && selectedCheckin.ai_flags.themes.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-bold text-violet-700 uppercase mb-1">مواضيع</p>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedCheckin.ai_flags.themes.map((t, i) => (
+                          <span key={i} className="text-[11px] bg-white text-violet-700 px-2 py-0.5 rounded-full border border-violet-200">{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Metadata footer */}
+              <div className="text-center text-[11px] text-slate-400 pb-2">
+                اتعمل في {new Date(selectedCheckin.created_at).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}
+              </div>
             </div>
           </div>
         </div>

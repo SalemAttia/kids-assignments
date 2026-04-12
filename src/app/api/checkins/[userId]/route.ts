@@ -4,7 +4,7 @@ import { createServerClient } from '@/lib/supabase/server'
 export async function GET(req: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params
   const { searchParams } = new URL(req.url)
-  const limit = Math.min(Number(searchParams.get('limit') ?? 14), 60)
+  const limit = Math.min(Number(searchParams.get('limit') ?? 14), 365)
 
   const supabase = await createServerClient()
 
