@@ -177,6 +177,8 @@ export default function ParentDashboard() {
   const [checkinListUser, setCheckinListUser] = useState<User | null>(null)
   const [checkinListData, setCheckinListData] = useState<Checkin[]>([])
   const [checkinListLoading, setCheckinListLoading] = useState(false)
+  const [showCheckinDeleteConfirm, setShowCheckinDeleteConfirm] = useState(false)
+  const [deletingCheckin, setDeletingCheckin] = useState(false)
 
   async function updateAiModel(field: 'reasoning_model' | 'fast_model', value: string) {
     const prev = { ...aiSettings }
@@ -283,6 +285,27 @@ export default function ParentDashboard() {
 
   function closeCheckinDetail() {
     setSelectedCheckin(null)
+    setShowCheckinDeleteConfirm(false)
+    setDeletingCheckin(false)
+  }
+
+  async function handleDeleteCheckin(checkinId: string, ownerId: string) {
+    setDeletingCheckin(true)
+    try {
+      const res = await fetch(`/api/checkin/${checkinId}`, { method: 'DELETE' })
+      if (res.ok) {
+        // Optimistically remove from all cached lists so the UI updates without a full refetch
+        setCheckins(prev => {
+          const userList = prev[ownerId] || []
+          return { ...prev, [ownerId]: userList.filter(c => c.id !== checkinId) }
+        })
+        setCheckinListData(prev => prev.filter(c => c.id !== checkinId))
+        closeCheckinDetail()
+      }
+    } catch {
+      // keep modal open so parent can retry
+    }
+    setDeletingCheckin(false)
   }
 
   async function handleDeleteSession(sessionId: string) {
@@ -1374,10 +1397,17 @@ export default function ParentDashboard() {
                   {new Date(selectedCheckin.checkin_date).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </p>
               </div>
-              <button
-                onClick={closeCheckinDetail}
-                className="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-500 text-sm transition-colors"
-              >✕</button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowCheckinDeleteConfirm(true)}
+                  className="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center text-red-500 text-sm transition-colors"
+                  title="حذف التشيك-إن"
+                >🗑</button>
+                <button
+                  onClick={closeCheckinDetail}
+                  className="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-500 text-sm transition-colors"
+                >✕</button>
+              </div>
             </div>
 
             <div className="p-4 space-y-4">
@@ -1547,6 +1577,41 @@ export default function ParentDashboard() {
               <div className="text-center text-[11px] text-slate-400 pb-2">
                 اتعمل في {new Date(selectedCheckin.created_at).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Check-in Delete Confirmation Overlay */}
+      {showCheckinDeleteConfirm && selectedCheckin && (
+        <div
+          className="fixed inset-0 z-[58] bg-black/60 flex items-center justify-center p-4"
+          dir="rtl"
+          onClick={() => setShowCheckinDeleteConfirm(false)}
+        >
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="text-center">
+              <div className="text-4xl mb-3">⚠️</div>
+              <h3 className="text-lg font-bold text-red-700">متأكد إنك عايز تحذف التشيك-إن ده؟</h3>
+              <p className="text-sm text-red-500 mt-2">
+                هيتم حذف كل إجابات {new Date(selectedCheckin.checkin_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })} - مش هتقدر ترجعهم
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleDeleteCheckin(selectedCheckin.id, selectedCheckin.user_id)}
+                disabled={deletingCheckin}
+                className="flex-1 py-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-bold rounded-xl transition-colors"
+              >
+                {deletingCheckin ? '⏳ بيتم الحذف...' : '🗑 أيوه، احذف'}
+              </button>
+              <button
+                onClick={() => setShowCheckinDeleteConfirm(false)}
+                disabled={deletingCheckin}
+                className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition-colors"
+              >
+                لا، ارجع
+              </button>
             </div>
           </div>
         </div>
