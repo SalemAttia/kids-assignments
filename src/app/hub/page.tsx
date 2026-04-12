@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { createClient } from '@/lib/supabase/client'
 import BottomNav from '@/components/BottomNav'
 
 type PrayerKey = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha'
@@ -43,6 +44,16 @@ export default function HubPage() {
   useEffect(() => {
     if (loaded && !userId) { router.replace('/'); return }
     if (!userId) return
+
+    // Preschool redirect guard
+    createClient()
+      .from('users')
+      .select('is_preschool')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => {
+        if (data?.is_preschool) router.replace('/preschool/hub')
+      })
 
     Promise.all([
       fetch(`/api/daily-stats/${userId}`).then(r => r.json()),

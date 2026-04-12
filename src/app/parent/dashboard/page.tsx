@@ -61,6 +61,7 @@ interface AdherenceData {
 
 function gradeLabel(grade: number) {
   const names: Record<number, string> = {
+    0: 'تمهيدي (KG)',
     1: 'الأول ابتدائي',   2: 'الثاني ابتدائي',  3: 'الثالث ابتدائي',
     4: 'الرابع ابتدائي',  5: 'الخامس ابتدائي',  6: 'السادسة ابتدائي',
     7: 'الأول إعدادي',    8: 'الثاني إعدادي',   9: 'الثالث إعدادي',
@@ -145,6 +146,47 @@ export default function ParentDashboard() {
   const [savingDifficulty, setSavingDifficulty] = useState<Record<string, boolean>>({})
   const [aiSettings, setAiSettings] = useState({ reasoning_model: 'gpt-4.1', fast_model: 'gpt-4.1-mini' })
   const [savingAiSettings, setSavingAiSettings] = useState(false)
+
+  // Add-child form state
+  const [newChildName, setNewChildName] = useState('')
+  const [newChildGrade, setNewChildGrade] = useState<number>(1)
+  const [newChildPreschool, setNewChildPreschool] = useState(false)
+  const [addingChild, setAddingChild] = useState(false)
+  const [addChildError, setAddChildError] = useState('')
+
+  async function handleAddChild() {
+    setAddChildError('')
+    if (!newChildName.trim()) {
+      setAddChildError('اكتب الاسم')
+      return
+    }
+    setAddingChild(true)
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newChildName.trim(),
+          grade: newChildPreschool ? 0 : newChildGrade,
+          is_preschool: newChildPreschool,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'فشل إضافة الطفل')
+      }
+      setNewChildName('')
+      setNewChildGrade(1)
+      setNewChildPreschool(false)
+      // Refetch users
+      const { data } = await createClient().from('users').select('*')
+      if (data) setUsers(data)
+    } catch (err: unknown) {
+      setAddChildError(err instanceof Error ? err.message : 'فشل إضافة الطفل')
+    } finally {
+      setAddingChild(false)
+    }
+  }
 
   async function updateAiModel(field: 'reasoning_model' | 'fast_model', value: string) {
     const prev = { ...aiSettings }
@@ -383,6 +425,53 @@ export default function ParentDashboard() {
           </div>
         </div>
 
+        {/* Add Child */}
+        <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100 shadow-sm mb-8">
+          <h3 className="text-lg font-bold text-blue-800 mb-1">➕ إضافة طفل جديد</h3>
+          <p className="text-sm text-blue-500 mb-4">للأطفال الصغيرين (تحت 5 سنين) فعّل وضع التمهيدي.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <input
+              type="text"
+              value={newChildName}
+              onChange={e => setNewChildName(e.target.value)}
+              placeholder="اسم الطفل"
+              className="bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <select
+              value={newChildPreschool ? 0 : newChildGrade}
+              onChange={e => setNewChildGrade(Number(e.target.value))}
+              disabled={newChildPreschool}
+              className="bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(g => (
+                <option key={g} value={g}>{gradeLabel(g)}</option>
+              ))}
+            </select>
+            <label className="flex items-center gap-2 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-blue-900 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newChildPreschool}
+                onChange={e => setNewChildPreschool(e.target.checked)}
+                className="w-4 h-4"
+              />
+              🧸 طفل تمهيدي (تحت 5 سنين)
+            </label>
+          </div>
+
+          {addChildError && (
+            <p className="text-red-600 text-sm mb-2">{addChildError}</p>
+          )}
+
+          <button
+            onClick={handleAddChild}
+            disabled={addingChild}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold disabled:opacity-50"
+          >
+            {addingChild ? 'بنحفظ...' : 'إضافة الطفل'}
+          </button>
+        </div>
+
         {users.map(user => {
           const userSessions = sessions[user.id] || []
           const stats = weeklyStats[user.id]
@@ -422,14 +511,25 @@ export default function ParentDashboard() {
           return (
             <div key={user.id} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm mb-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="text-4xl">{user.grade <= 6 ? '🧒' : '👦'}</div>
+                <div className="text-4xl">{user.is_preschool ? '🧸' : user.grade <= 6 ? '🧒' : '👦'}</div>
                 <div>
-                  <h2 className="text-2xl font-bold text-blue-800">{user.name}</h2>
-                  <p className="text-slate-500">الصف {gradeLabel(user.grade)} · {user.points} نقطة · 🔥 {user.streak} يوم</p>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-blue-800">{user.name}</h2>
+                    {user.is_preschool && (
+                      <span className="px-2 py-0.5 rounded-full bg-pink-100 text-pink-700 text-xs font-bold border border-pink-200">
+                        🧸 تمهيدي
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-slate-500">
+                    {gradeLabel(user.grade)} · {user.points} نقطة
+                    {!user.is_preschool && ` · 🔥 ${user.streak} يوم`}
+                  </p>
                 </div>
               </div>
 
               {/* Quiz Difficulty Control */}
+              {!user.is_preschool && (
               <div className="mb-6 bg-indigo-50 rounded-2xl p-4 border border-indigo-100">
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   <div>
@@ -457,8 +557,10 @@ export default function ParentDashboard() {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Prayer Tracker Section */}
+              {!user.is_preschool && (
               <div className="mb-6 bg-teal-50 rounded-2xl p-5 border border-teal-100">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-teal-800">🤲 متابعة الصلوات</h3>
@@ -535,9 +637,10 @@ export default function ParentDashboard() {
                   <p className="text-teal-600 text-sm mt-3 text-center">لم يتم تسجيل أي صلوات اليوم بعد</p>
                 )}
               </div>
+              )}
 
               {/* Weekly Schedule Adherence */}
-              {(() => {
+              {!user.is_preschool && (() => {
                 const adh = adherence[user.id]
                 if (!adh) return null
                 if (!adh.hasSchedule) {
@@ -753,6 +856,7 @@ export default function ParentDashboard() {
               )}
 
               {/* Weekly AI Summary */}
+              {!user.is_preschool && (
               <div className="border-t border-slate-100 pt-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-slate-700">الملخص الأسبوعي بالذكاء الاصطناعي</h3>
@@ -787,6 +891,7 @@ export default function ParentDashboard() {
                   <p className="text-slate-400 text-sm">اضغط على &quot;اعمل ملخص&quot; عشان تاخد تقرير أسبوعي مفصل</p>
                 )}
               </div>
+              )}
 
               {/* Recent Sessions */}
               {userSessions.length > 0 && (

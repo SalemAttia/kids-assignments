@@ -128,6 +128,64 @@ ${imageUserRules}
   }
 }
 
+// =========================================================================
+// Preschool (KG) mode — very young kids (~4yr), parent reads questions aloud
+// =========================================================================
+
+export type PreschoolSubject = 'math' | 'arabic' | 'english'
+
+const PRESCHOOL_SUBJECT_INSTRUCTIONS: Record<PreschoolSubject, string> = {
+  math: `- المادة: رياضيات تمهيدي
+- المواضيع المسموحة فقط: العد من 1 لـ 10، تمييز الأرقام، أكبر/أصغر، الأشكال البسيطة (دائرة/مربع/مثلث)، الألوان، أنماط سهلة
+- ممنوع تماماً عمليات حسابية أصعب من 1+1 أو 2+1
+- الاختيارات لازم تكون رقم واحد أو كلمة واحدة أو شكل واحد أو إيموجي
+- أمثلة مناسبة: "كام تفاحة هنا؟ 🍎🍎🍎"، "أنهي أكبر؟"، "لون إيه ده؟ 🍌"`,
+
+  arabic: `- المادة: عربي تمهيدي
+- المواضيع المسموحة فقط: التعرف على الحروف (أ ب ت ث ج ح خ د ر س ش م ن)، صوت أول حرف في كلمة، أسماء حيوانات، أجزاء الجسم، أشياء بسيطة حوالين الطفل
+- ممنوع تماماً أي قواعد أو نحو أو إملاء أو قراءة جملة
+- الاختيارات لازم تكون حرف واحد أو كلمة واحدة
+- أمثلة مناسبة: "أنهي حرف ده؟"، "الأسد بيقول إيه؟"، "ده إيه؟ 🐘"`,
+
+  english: `- Subject: English for a 4-year-old preschooler
+- Allowed topics only: colors, animals, numbers 1–10, alphabet letters A–Z, single simple everyday words (cat, dog, sun, car, ...)
+- Question text itself is in Arabic (the parent reads it aloud); the English word is the answer
+- Options must be exactly 1 English word or 1 English letter
+- Example: question_text: "لون إيه ده؟ 🍎" options: ["Red", "Blue"]
+- Example: question_text: "ده إيه بالإنجليزي؟ 🐱" options: ["Cat", "Dog"]`,
+}
+
+export function buildPreschoolQuestionsPrompt(subject: PreschoolSubject) {
+  const instructions = PRESCHOOL_SUBJECT_INSTRUCTIONS[subject]
+  return {
+    system: `أنت معلمة روضة لطيفة بتعملي تمارين بسيطة لطفل عمره 4 سنين.
+الأب أو الأم بيقرا السؤال بصوت عالي، والطفل بيختار الإجابة، والأب بيدوس عليها.
+القواعد الصارمة جداً:
+- كل الأسئلة "اختيار من متعدد" بـ اختيارين فقط (مش 3)
+- السؤال قصير جداً جداً (5 كلمات أو أقل)
+- الاختيارات لازم تكون كلمة واحدة أو رقم واحد أو حرف واحد أو إيموجي
+- ممنوع أي سؤال يحتاج الطفل يقرا جملة
+- استخدم إيموجي كتير في نص السؤال عشان الطفل يفهم من الصورة
+- الإجابة الصحيحة لازم تكون واضحة جداً
+- استخدم عامية مصرية بسيطة جداً
+${instructions}
+- أجب دائماً بـ JSON فقط، بدون أي نص إضافي`,
+    user: `أنشئ 5 أسئلة تمهيدي بسيطة جداً للطفل.
+
+أعد JSON بالشكل ده بالظبط:
+{
+  "questions": [
+    {
+      "question_text": "كام تفاحة؟ 🍎🍎🍎",
+      "question_type": "multiple_choice",
+      "options": ["3", "5"],
+      "correct_answer": "3"
+    }
+  ]
+}`
+  }
+}
+
 export function buildEvaluateAnswersPrompt(
   subject: Subject,
   grade: number,
@@ -137,9 +195,45 @@ export function buildEvaluateAnswersPrompt(
     question_type: string
     correct_answer: string
     student_answer: string
-  }>
+  }>,
+  isPreschool: boolean = false
 ) {
   const subjectLabel = SUBJECT_LABELS[subject]
+  if (isPreschool) {
+    return {
+      system: `أنت معلمة روضة حنينة جداً بتصححي تمارين لطفل عمره 4 سنين.
+الأب كان بيساعد الطفل في الإجابة.
+القواعد:
+- كن متساهلة جداً جداً في التصحيح — كل إجابة بتوصل للصح، اعتبريها صح
+- التعليق لازم يكون جملة واحدة قصيرة ومرحة فقط (زي: "شاطر يا حبيبي! 💕")
+- ممنوع أي شرح أكاديمي
+- "mistakes" و "suggestions" رجّعيهم فاضيين []
+- كل per_question يبقى فيه explanation قصير وإيجابي
+- استخدم عامية مصرية مرحة للأطفال الصغيرين
+- أجب دائماً بـ JSON فقط`,
+      user: `الطفل في التمهيدي
+المادة: ${subjectLabel}
+
+الأسئلة والإجابات:
+${JSON.stringify(questionsAndAnswers, null, 2)}
+
+قيّمي الإجابات بتساهل شديد وأعيدي JSON بالشكل ده:
+{
+  "total_score": <0-100>,
+  "feedback": "<جملة واحدة قصيرة ومرحة تشجع الطفل>",
+  "per_question": [
+    {
+      "question_id": "...",
+      "is_correct": true,
+      "score": 100,
+      "explanation": "<كلمة تشجيع قصيرة>"
+    }
+  ],
+  "mistakes": [],
+  "suggestions": []
+}`
+    }
+  }
   return {
     system: `أنت مدرس طيب ومشجع جداً بتصحح اختبارات للطلاب المصريين.
 قيّم إجابات الطالب بتساهل ولطف، وقدم تغذية راجعة إيجابية ومشجعة بالعامية المصرية البسيطة.
