@@ -74,6 +74,12 @@ export default function ReportPage() {
     router.push('/hub')
   }
 
+  function handleGoCheckin() {
+    clearSession()
+    sessionStorage.removeItem('reportData')
+    router.push('/checkin')
+  }
+
   if (!data) return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 gap-4">
       <div className="text-6xl animate-bounce">⏳</div>
@@ -207,6 +213,13 @@ export default function ReportPage() {
             className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl font-black text-xl shadow-lg active:scale-95 transition-all"
           >
             📚 اذاكر تاني!
+          </button>
+          <button
+            onClick={handleGoCheckin}
+            className="w-full py-3 bg-white border-2 border-violet-200 text-violet-700 rounded-2xl font-bold text-base shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <span>💙</span>
+            <span>قولي إزيك النهاردة</span>
           </button>
           <button
             onClick={handleGoHome}

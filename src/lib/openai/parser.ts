@@ -41,6 +41,12 @@ export const WeeklySummarySchema = z.object({
   recommendations: z.array(z.string()),
 })
 
+export const CheckinAnalysisSchema = z.object({
+  summary: z.string(),
+  red_flags: z.array(z.string()),
+  themes: z.array(z.string()),
+})
+
 export function parseJSON<T>(schema: z.ZodSchema<T>, raw: string): T {
   const parsed = JSON.parse(raw)
   return schema.parse(parsed)

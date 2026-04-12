@@ -2,9 +2,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { SUBJECT_LABELS, QUIZ_DIFFICULTY_LABELS } from '@/types'
+import { SUBJECT_LABELS, QUIZ_DIFFICULTY_LABELS, CHECKIN_MOOD_LABELS } from '@/types'
 import { MODEL_OPTIONS, DEFAULT_MODELS } from '@/lib/openai/models'
-import type { User, Subject, QuizDifficulty } from '@/types'
+import type { User, Subject, QuizDifficulty, Checkin, CheckinMood } from '@/types'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend
@@ -136,6 +136,7 @@ export default function ParentDashboard() {
   const [loadingSummary, setLoadingSummary] = useState<Record<string, boolean>>({})
   const [prayerLogs, setPrayerLogs] = useState<Record<string, PrayerLog[]>>({})
   const [adherence, setAdherence] = useState<Record<string, AdherenceData>>({})
+  const [checkins, setCheckins] = useState<Record<string, Checkin[]>>({})
   const [loading, setLoading] = useState(true)
   const [selectedSession, setSelectedSession] = useState<SessionDetail | null>(null)
   const [modalLoading, setModalLoading] = useState(false)
@@ -264,13 +265,15 @@ export default function ParentDashboard() {
     const statsMap: Record<string, WeeklyStats> = {}
     const prayerMap: Record<string, PrayerLog[]> = {}
     const adherenceMap: Record<string, AdherenceData> = {}
+    const checkinsMap: Record<string, Checkin[]> = {}
 
     await Promise.all(usersData.map(async (user) => {
-      const [sessRes, statsRes, prayerRes, adhRes] = await Promise.all([
+      const [sessRes, statsRes, prayerRes, adhRes, checkinRes] = await Promise.all([
         fetch(`/api/reports/${user.id}`),
         fetch(`/api/reports/weekly/${user.id}`),
         fetch(`/api/prayers/${user.id}?days=7`),
         fetch(`/api/schedule/adherence/${user.id}`),
+        fetch(`/api/checkins/${user.id}?limit=14`),
       ])
       if (sessRes.ok) {
         const d = await sessRes.json()
@@ -286,12 +289,17 @@ export default function ParentDashboard() {
       if (adhRes.ok) {
         adherenceMap[user.id] = await adhRes.json()
       }
+      if (checkinRes.ok) {
+        const d = await checkinRes.json()
+        checkinsMap[user.id] = d.checkins || []
+      }
     }))
 
     setSessions(sessionsMap)
     setWeeklyStats(statsMap)
     setPrayerLogs(prayerMap)
     setAdherence(adherenceMap)
+    setCheckins(checkinsMap)
     setLoading(false)
   }
 
@@ -535,6 +543,169 @@ export default function ParentDashboard() {
                   <p className="text-teal-600 text-sm mt-3 text-center">لم يتم تسجيل أي صلوات اليوم بعد</p>
                 )}
               </div>
+
+              {/* Wellbeing & Struggles (from daily check-ins) */}
+              {(() => {
+                const userCheckins = checkins[user.id] || []
+                if (userCheckins.length === 0) {
+                  return (
+                    <div className="mb-6 bg-violet-50 rounded-2xl p-5 border border-violet-100">
+                      <h3 className="text-lg font-bold text-violet-800 mb-2">💙 التشيك-إن اليومي</h3>
+                      <p className="text-violet-600 text-sm text-center">لسه ما عملش تشيك-إن لليوم</p>
+                    </div>
+                  )
+                }
+
+                // Mood timeline (oldest -> newest) for the sparkline
+                const MOOD_SCORE: Record<CheckinMood, number> = { great: 5, good: 4, okay: 3, tired: 2, sad: 1 }
+                const moodSeries = [...userCheckins].reverse().map(c => ({
+                  date: new Date(c.checkin_date).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }),
+                  المزاج: c.mood ? MOOD_SCORE[c.mood] : null,
+                }))
+
+                // Red flags — streak of low confidence (<=2) on any subject across ≥2 recent days
+                type SubjectConfidenceMap = Map<Subject, number[]>
+                const confidenceBySubject: SubjectConfidenceMap = new Map()
+                userCheckins.slice(0, 7).forEach(c => {
+                  (c.subjects_studied || []).forEach(ss => {
+                    const arr = confidenceBySubject.get(ss.subject) || []
+                    arr.push(ss.confidence)
+                    confidenceBySubject.set(ss.subject, arr)
+                  })
+                })
+                const lowConfidenceSubjects: { subject: Subject; days: number; avg: number }[] = []
+                confidenceBySubject.forEach((vals, subj) => {
+                  const low = vals.filter(v => v <= 2).length
+                  if (low >= 2) {
+                    lowConfidenceSubjects.push({
+                      subject: subj,
+                      days: low,
+                      avg: Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10,
+                    })
+                  }
+                })
+
+                // Latest struggles
+                const struggles = userCheckins
+                  .filter(c => c.hardest_thing && c.hardest_thing.trim().length > 0)
+                  .slice(0, 5)
+
+                // Bothered flags in the last 3 days
+                const recentBothered = userCheckins
+                  .slice(0, 3)
+                  .filter(c => c.bothered)
+
+                // Today's mood + latest AI flags
+                const today = userCheckins[0]
+                const latestAi = userCheckins.find(c => c.ai_flags)?.ai_flags
+
+                return (
+                  <div className="mb-6 bg-violet-50 rounded-2xl p-5 border border-violet-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold text-violet-800">💙 التشيك-إن اليومي</h3>
+                      {today?.mood && (
+                        <span className="bg-violet-100 text-violet-700 font-bold px-3 py-1 rounded-lg text-sm flex items-center gap-1">
+                          <span className="text-lg">{CHECKIN_MOOD_LABELS[today.mood].emoji}</span>
+                          <span>{CHECKIN_MOOD_LABELS[today.mood].label}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Mood trend sparkline */}
+                    {moodSeries.length >= 2 && (
+                      <div className="bg-white rounded-xl p-3 mb-4 border border-violet-100">
+                        <p className="text-xs text-slate-500 font-semibold mb-2">اتجاه المزاج - آخر {moodSeries.length} يوم</p>
+                        <ResponsiveContainer width="100%" height={100}>
+                          <LineChart data={moodSeries}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                            <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fontSize: 10 }} />
+                            <Tooltip />
+                            <Line type="monotone" dataKey="المزاج" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6' }} connectNulls />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {/* AI red flags */}
+                    {latestAi && latestAi.red_flags && latestAi.red_flags.length > 0 && (
+                      <div className="bg-red-50 rounded-xl p-3 mb-3 border border-red-200">
+                        <p className="text-xs font-bold text-red-700 mb-2">🚨 إشارات انتباه (من الذكاء الاصطناعي)</p>
+                        <ul className="space-y-1">
+                          {latestAi.red_flags.map((flag, i) => (
+                            <li key={i} className="text-sm text-red-700">• {flag}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Low confidence subjects */}
+                    {lowConfidenceSubjects.length > 0 && (
+                      <div className="bg-orange-50 rounded-xl p-3 mb-3 border border-orange-200">
+                        <p className="text-xs font-bold text-orange-700 mb-2">⚠️ مواد بيحس إنه مش فاهمها</p>
+                        <div className="flex flex-wrap gap-2">
+                          {lowConfidenceSubjects.map(lc => (
+                            <span
+                              key={lc.subject}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-100 border border-orange-300 text-orange-800 text-xs font-semibold"
+                            >
+                              <span>{SUBJECT_EMOJIS[lc.subject] ?? '📚'}</span>
+                              <span>{SUBJECT_LABELS[lc.subject] || lc.subject}</span>
+                              <span className="text-[10px] text-orange-600">({lc.days} يوم · ثقة {lc.avg}/5)</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bothered alert */}
+                    {recentBothered.length > 0 && (
+                      <div className="bg-amber-50 rounded-xl p-3 mb-3 border border-amber-200">
+                        <p className="text-xs font-bold text-amber-800 mb-2">💭 في حاجة مضايقاه</p>
+                        {recentBothered.map(c => (
+                          <div key={c.id} className="text-sm text-amber-800 mb-1">
+                            <span className="text-xs text-amber-600">{new Date(c.checkin_date).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' })}: </span>
+                            {c.bothered_note || '(بدون تفاصيل)'}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Recent struggles */}
+                    {struggles.length > 0 && (
+                      <div className="bg-white rounded-xl p-3 border border-violet-100">
+                        <p className="text-xs font-bold text-slate-600 mb-2">📝 آخر أصعب حاجة قالها</p>
+                        <div className="space-y-2">
+                          {struggles.map(c => (
+                            <div key={c.id} className="flex gap-2 items-start text-sm text-slate-700 border-r-2 border-violet-300 pr-2">
+                              <span className="text-[11px] text-slate-400 flex-shrink-0 whitespace-nowrap">
+                                {new Date(c.checkin_date).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' })}
+                              </span>
+                              <div className="flex-1">
+                                <p className="leading-snug">{c.hardest_thing}</p>
+                                {c.struggle_image_url && (
+                                  <button
+                                    onClick={() => setLightboxUrl(c.struggle_image_url)}
+                                    className="mt-1 inline-block"
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={c.struggle_image_url} alt="صورة" className="h-16 rounded-lg border border-slate-200 hover:opacity-80 transition-opacity" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Latest AI summary */}
+                    {latestAi?.summary && (
+                      <p className="text-xs text-violet-600 italic mt-3 text-center">💬 {latestAi.summary}</p>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Weekly Schedule Adherence */}
               {(() => {
