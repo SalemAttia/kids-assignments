@@ -3,9 +3,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import BottomNav from '@/components/BottomNav'
+import { CHECKIN_MOOD_LABELS, type CheckinMood } from '@/types'
 
 type PrayerKey = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha'
 interface PrayerLog { prayer_date: string; fajr: boolean; dhuhr: boolean; asr: boolean; maghrib: boolean; isha: boolean }
+
+interface TodayCheckin { id: string; mood: CheckinMood | null }
 
 const PRAYERS: { key: PrayerKey; label: string; emoji: string }[] = [
   { key: 'fajr',    label: 'الفجر',  emoji: '🌅' },
@@ -36,6 +39,7 @@ export default function HubPage() {
   const [prayerSaving, setPrayerSaving] = useState<PrayerKey | null>(null)
   const [todaySchedule, setTodaySchedule] = useState<string[]>([])
   const [studiedToday, setStudiedToday] = useState<Set<string>>(new Set())
+  const [todayCheckin, setTodayCheckin] = useState<TodayCheckin | null>(null)
 
   const today = new Date().toISOString().split('T')[0]
   const todayDayIndex = new Date().getDay()
@@ -48,7 +52,8 @@ export default function HubPage() {
       fetch(`/api/daily-stats/${userId}`).then(r => r.json()),
       fetch(`/api/prayers/${userId}?date=${today}`).then(r => r.json()),
       fetch(`/api/schedule/${userId}`).then(r => r.json()),
-    ]).then(([stats, prayerData, scheduleData]) => {
+      fetch(`/api/checkins/today/${userId}`).then(r => r.json()).catch(() => ({ checkin: null })),
+    ]).then(([stats, prayerData, scheduleData, checkinData]) => {
       setUserName(stats.user?.name ?? '')
       setStreak(stats.user?.streak ?? 0)
       setPoints(stats.user?.points ?? 0)
@@ -59,6 +64,7 @@ export default function HubPage() {
       // What was already studied today
       const studied = new Set<string>((stats.today?.subjects ?? []).map((s: { key: string }) => s.key))
       setStudiedToday(studied)
+      setTodayCheckin(checkinData?.checkin ?? null)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [loaded, userId, router, today, todayDayIndex])
@@ -126,6 +132,41 @@ export default function HubPage() {
             </button>
           </div>
         </div>
+
+        {/* Daily Check-in Card */}
+        {todayCheckin ? (
+          <button
+            onClick={() => router.push('/checkin')}
+            className="w-full flex items-center justify-between bg-white rounded-3xl p-4 shadow-sm mb-4 border-2 border-violet-100 active:scale-[0.98] transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">
+                {todayCheckin.mood ? CHECKIN_MOOD_LABELS[todayCheckin.mood].emoji : '💙'}
+              </span>
+              <div className="text-right">
+                <div className="text-sm font-black text-slate-800">تشيك-إن النهاردة تم ✅</div>
+                <div className="text-[11px] text-slate-400">
+                  {todayCheckin.mood ? `مزاجك: ${CHECKIN_MOOD_LABELS[todayCheckin.mood].label}` : 'شكرًا إنك قلتلي'}
+                </div>
+              </div>
+            </div>
+            <span className="text-xs text-violet-500 font-bold bg-violet-50 px-3 py-1.5 rounded-xl">شوف</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => router.push('/checkin')}
+            className="w-full flex items-center justify-between bg-gradient-to-r from-violet-500 to-blue-600 rounded-3xl p-5 shadow-lg mb-4 text-white active:scale-[0.98] transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-4xl animate-bounce">💙</span>
+              <div className="text-right">
+                <div className="text-base font-black">قولي إزيك النهاردة</div>
+                <div className="text-[11px] opacity-90 font-medium">دقيقة واحدة بس · +10 نقط ⭐</div>
+              </div>
+            </div>
+            <span className="text-xl">←</span>
+          </button>
+        )}
 
         {/* Today's Schedule — main card */}
         <div className="bg-white rounded-3xl p-5 shadow-sm mb-4">

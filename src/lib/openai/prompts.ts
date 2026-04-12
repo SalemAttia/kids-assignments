@@ -1,4 +1,4 @@
-import { Subject, SUBJECT_LABELS, QuizDifficulty } from '@/types'
+import { Subject, SUBJECT_LABELS, QuizDifficulty, CheckinSubject, CheckinMood, CheckinEnergy, CheckinSleep } from '@/types'
 
 const DIFFICULTY_INSTRUCTIONS: Record<QuizDifficulty, string> = {
   easy: `- مستوى الأسئلة: سهل جداً
@@ -179,6 +179,80 @@ ${JSON.stringify(questionsAndAnswers, null, 2)}
     }
   ],
   "suggestions": ["<اقتراح تحسين 1>", "<اقتراح تحسين 2>"]
+}`
+  }
+}
+
+export function buildCheckinAnalysisPrompt(params: {
+  studentName: string
+  grade: number
+  today: {
+    checkin_date: string
+    mood: CheckinMood | null
+    energy: CheckinEnergy | null
+    sleep: CheckinSleep | null
+    subjects_studied: CheckinSubject[]
+    hardest_thing: string | null
+    best_thing: string | null
+    bothered: boolean
+    bothered_note: string | null
+  }
+  recent: Array<{
+    checkin_date: string
+    mood: CheckinMood | null
+    energy: CheckinEnergy | null
+    subjects_studied: CheckinSubject[]
+    hardest_thing: string | null
+    bothered: boolean
+  }>
+}) {
+  const subjectsLine = params.today.subjects_studied.length > 0
+    ? params.today.subjects_studied.map(s =>
+        `${SUBJECT_LABELS[s.subject]}: صعوبة=${s.difficulty}, ثقة=${s.confidence}/5, متعة=${s.enjoyment}`
+      ).join(' | ')
+    : 'لم يذاكر مواد اليوم'
+
+  const recentLine = params.recent.length > 0
+    ? params.recent.map(r =>
+        `${r.checkin_date}: mood=${r.mood ?? '?'}, energy=${r.energy ?? '?'}, bothered=${r.bothered ? 'yes' : 'no'}` +
+        (r.hardest_thing ? `, hardest="${r.hardest_thing.slice(0, 80)}"` : '') +
+        (r.subjects_studied.length > 0
+          ? `, subjects=[${r.subjects_studied.map(s => `${s.subject}(c${s.confidence},${s.difficulty})`).join(',')}]`
+          : '')
+      ).join('\n')
+    : 'لا يوجد تشيك-إن سابق'
+
+  return {
+    system: `أنت مستشار تعليمي ونفسي بتساعد أهالي الطلاب المصريين يفهموا ابنهم بيحس إزاي ومحتاج إيه.
+مهمتك: تحلل التشيك-إن اليومي للطالب مع آخر أيام سابقة، وترجع إشارات واضحة للأهل.
+القواعد:
+- اكتب بالعامية المصرية البسيطة، باختصار شديد
+- كل "red_flag" لازم يكون قصير جداً ومحدد (زي: "ثقة منخفضة في الرياضيات 3 أيام متتالية")، مش شرح طويل
+- كل "theme" كلمة أو كلمتين يلخصوا موضوع متكرر (زي: "الكسور"، "قلق من الامتحان")
+- الـ summary جملة أو جملتين بس تلخص إحساس اليوم
+- ما تبالغش في التحذيرات - بس اللي فعلاً ملحوظ
+- لو مفيش إشارات خطر، رجع red_flags فاضية
+- أجب بـ JSON فقط`,
+    user: `الطالب: ${params.studentName} (الصف ${params.grade})
+تاريخ اليوم: ${params.today.checkin_date}
+
+تشيك-إن اليوم:
+- المزاج: ${params.today.mood ?? '?'}
+- الطاقة: ${params.today.energy ?? '?'}
+- النوم: ${params.today.sleep ?? '?'}
+- المواد اللي ذاكرها: ${subjectsLine}
+- أصعب حاجة: ${params.today.hardest_thing || '(لم يذكر)'}
+- أحسن حاجة: ${params.today.best_thing || '(لم يذكر)'}
+- في حاجة مضايقاه: ${params.today.bothered ? `آه - "${params.today.bothered_note || 'بدون تفاصيل'}"` : 'لا'}
+
+آخر 6 أيام سابقة (للاتجاه):
+${recentLine}
+
+حلل ورجع JSON:
+{
+  "summary": "<جملة أو جملتين>",
+  "red_flags": ["<إشارة خطر قصيرة 1>", "<إشارة خطر قصيرة 2>"],
+  "themes": ["<موضوع متكرر 1>", "<موضوع متكرر 2>"]
 }`
   }
 }

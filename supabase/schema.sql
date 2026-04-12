@@ -136,3 +136,24 @@ CREATE TABLE IF NOT EXISTS ai_settings (
 INSERT INTO ai_settings (id, reasoning_model, fast_model)
 VALUES ('global', 'gpt-4.1', 'gpt-4.1-mini')
 ON CONFLICT (id) DO NOTHING;
+
+-- Daily student check-ins: subjective signal about how the kid feels,
+-- what they studied, what was hard, and whether anything is bothering them.
+CREATE TABLE IF NOT EXISTS checkins (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  checkin_date DATE NOT NULL,
+  mood TEXT CHECK (mood IN ('great','good','okay','tired','sad')),
+  energy TEXT CHECK (energy IN ('high','medium','low')),
+  sleep TEXT CHECK (sleep IN ('good','okay','bad')),
+  subjects_studied JSONB NOT NULL DEFAULT '[]'::jsonb,
+  hardest_thing TEXT,
+  struggle_image_url TEXT,
+  best_thing TEXT,
+  bothered BOOLEAN NOT NULL DEFAULT FALSE,
+  bothered_note TEXT,
+  ai_flags JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, checkin_date)
+);
+CREATE INDEX IF NOT EXISTS idx_checkins_user_date ON checkins(user_id, checkin_date DESC);

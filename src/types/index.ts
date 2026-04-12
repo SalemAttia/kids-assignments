@@ -103,3 +103,49 @@ export interface EvaluateRequest {
   sessionId: string
   answers: { questionId: string; answerText: string }[]
 }
+
+// ---------- Check-ins ----------
+
+export type CheckinMood = 'great' | 'good' | 'okay' | 'tired' | 'sad'
+export type CheckinEnergy = 'high' | 'medium' | 'low'
+export type CheckinSleep = 'good' | 'okay' | 'bad'
+export type CheckinSubjectDifficulty = 'easy' | 'medium' | 'hard'
+export type CheckinSubjectEnjoyment = 'like' | 'meh' | 'dislike'
+
+export interface CheckinSubject {
+  subject: Subject
+  difficulty: CheckinSubjectDifficulty
+  confidence: number // 1..5
+  enjoyment: CheckinSubjectEnjoyment
+}
+
+export interface CheckinAIFlags {
+  summary: string
+  red_flags: string[]
+  themes: string[]
+}
+
+export interface Checkin {
+  id: string
+  user_id: string
+  checkin_date: string
+  mood: CheckinMood | null
+  energy: CheckinEnergy | null
+  sleep: CheckinSleep | null
+  subjects_studied: CheckinSubject[]
+  hardest_thing: string | null
+  struggle_image_url: string | null
+  best_thing: string | null
+  bothered: boolean
+  bothered_note: string | null
+  ai_flags: CheckinAIFlags | null
+  created_at: string
+}
+
+export const CHECKIN_MOOD_LABELS: Record<CheckinMood, { emoji: string; label: string }> = {
+  great: { emoji: '😄', label: 'رائع'   },
+  good:  { emoji: '🙂', label: 'كويس'   },
+  okay:  { emoji: '😐', label: 'عادي'   },
+  tired: { emoji: '😕', label: 'تعبان'  },
+  sad:   { emoji: '😢', label: 'زعلان'  },
+}
