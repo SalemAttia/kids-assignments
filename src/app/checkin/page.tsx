@@ -334,7 +334,7 @@ export default function CheckinPage() {
 
             {/* Mood */}
             <div className="bg-white rounded-3xl p-5 shadow-sm mb-4">
-              <p className="text-sm font-bold text-slate-600 mb-3">مزاجك دلوقتي؟</p>
+              <p className="text-sm font-bold text-slate-600 mb-3">إزيك؟</p>
               <div className="grid grid-cols-5 gap-2">
                 {MOOD_OPTIONS.map(m => {
                   const selected = mood === m.value
@@ -356,7 +356,7 @@ export default function CheckinPage() {
 
             {/* Energy */}
             <div className="bg-white rounded-3xl p-5 shadow-sm mb-4">
-              <p className="text-sm font-bold text-slate-600 mb-3">طاقتك إزاي؟</p>
+              <p className="text-sm font-bold text-slate-600 mb-3">حاسس بنشاط؟</p>
               <div className="grid grid-cols-3 gap-2">
                 {ENERGY_OPTIONS.map(e => {
                   const selected = energy === e.value
