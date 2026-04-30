@@ -4,6 +4,9 @@ import { getOpenAI, getModelForRole } from '@/lib/openai/client'
 import { SUBJECT_LABELS } from '@/types'
 import type { Subject } from '@/types'
 
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
 const QUICK_ACTIONS: Record<Subject, string[]> = {
   arabic:         ['اشرح القاعدة بمثال', 'الفرق بين كلمتين', 'أعرب هذه الجملة', 'صحح الخطأ الإملائي'],
   math:           ['احل المسألة خطوة خطوة', 'اشرح القانون', 'مثال أسهل', 'الفرق بين العمليتين'],

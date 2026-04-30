@@ -5,6 +5,9 @@ import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { type Subject } from '@/types'
 import BottomNav from '@/components/BottomNav'
 
+const HEADER_REGEX = /^\*\*([^*]+)\*\*$/
+const TIP_REGEX = /💡\s*تذكر\s*دا[يئ]ماً?\s*[:：]?\s*([\s\S]*)$/m
+
 /** Render a single line with inline **bold** markers. */
 function renderInline(line: string, keyPrefix: string) {
   const parts = line.split(/(\*\*[^*]+\*\*)/g)
@@ -18,26 +21,25 @@ function renderInline(line: string, keyPrefix: string) {
 
 /** Split the AI explanation into a body and (optionally) the final "تذكر دايماً" tip. */
 function ExplanationContent({ text }: { text: string }) {
-  const tipRegex = /💡\s*تذكر\s*دا[يئ]ماً?\s*[:：]?\s*([\s\S]*)$/m
-  const match = text.match(tipRegex)
-  const body = match ? text.slice(0, match.index).trim() : text.trim()
+  const match = text.match(TIP_REGEX)
+  const splitAt = match?.index ?? text.length
+  const body = match ? text.slice(0, splitAt).trim() : text.trim()
   const tip = match ? match[1].trim() : ''
 
-  const lines = body.split(/\n+/).filter(l => l.trim())
+  const lines = body.split(/\n+/).map(l => l.trim()).filter(Boolean)
 
   return (
     <div className="space-y-3 text-slate-700 leading-relaxed text-sm">
       {lines.map((line, i) => {
-        const trimmed = line.trim()
-        const isHeader = /^\*\*.+\*\*$/.test(trimmed)
-        if (isHeader) {
+        const headerMatch = line.match(HEADER_REGEX)
+        if (headerMatch) {
           return (
             <p key={i} className="text-violet-700 font-bold text-base mt-2">
-              {renderInline(trimmed, `h-${i}`)}
+              {headerMatch[1]}
             </p>
           )
         }
-        return <p key={i}>{renderInline(trimmed, `p-${i}`)}</p>
+        return <p key={i}>{renderInline(line, `p-${i}`)}</p>
       })}
       {tip && (
         <div className="mt-4 bg-gradient-to-r from-amber-100 to-yellow-100 border-2 border-amber-300 rounded-2xl p-3 flex gap-2 items-start shadow-sm">
@@ -50,6 +52,37 @@ function ExplanationContent({ text }: { text: string }) {
       )}
     </div>
   )
+}
+
+/** Downscale + JPEG-encode an image so multi-upload payloads stay under server body limits. */
+function compressImage(file: File, maxDim = 1600, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const ratio = Math.min(1, maxDim / Math.max(img.width, img.height))
+        const w = Math.max(1, Math.round(img.width * ratio))
+        const h = Math.max(1, Math.round(img.height * ratio))
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { reject(new Error('canvas-unavailable')); return }
+        ctx.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      } catch (e) {
+        reject(e)
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('image-decode-failed'))
+    }
+    img.src = url
+  })
 }
 
 const SUBJECTS: { value: Subject; emoji: string; label: string; color: string }[] = [
@@ -88,23 +121,25 @@ export default function HelpPage() {
     if (loaded && !userId) router.replace('/')
   }, [loaded, userId, router])
 
-  function handleImageFiles(files: File[]) {
+  async function handleImageFiles(files: File[]) {
     const remaining = MAX_IMAGES - imagePreviews.length
     const toAdd = files.slice(0, remaining)
 
-    const oversized = toAdd.filter(f => f.size > 5 * 1024 * 1024)
-    if (oversized.length > 0) { setError('الصورة أكبر من 5 ميجابايت، اختار صورة أصغر'); return }
+    const oversized = toAdd.filter(f => f.size > 15 * 1024 * 1024)
+    if (oversized.length > 0) { setError('الصورة أكبر من 15 ميجابايت، اختار صورة أصغر'); return }
 
-    toAdd.forEach(file => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string
-        setImagePreviews(prev => [...prev, base64])
-        setImageBase64Array(prev => [...prev, base64])
-      }
-      reader.readAsDataURL(file)
-    })
     setError('')
+    const results = await Promise.allSettled(toAdd.map(f => compressImage(f)))
+    const ok = results
+      .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+      .map(r => r.value)
+    const failed = results.length - ok.length
+
+    if (ok.length > 0) {
+      setImagePreviews(prev => [...prev, ...ok])
+      setImageBase64Array(prev => [...prev, ...ok])
+    }
+    if (failed > 0) setError('في صورة أو أكتر مقدرناش نقراها، جرب صورة تانية')
   }
 
   function removeImage(index: number) {
