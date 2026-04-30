@@ -1,9 +1,56 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { type Subject } from '@/types'
 import BottomNav from '@/components/BottomNav'
+
+/** Render a single line with inline **bold** markers. */
+function renderInline(line: string, keyPrefix: string) {
+  const parts = line.split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={`${keyPrefix}-${i}`} className="font-bold text-violet-800">{part.slice(2, -2)}</strong>
+    }
+    return <Fragment key={`${keyPrefix}-${i}`}>{part}</Fragment>
+  })
+}
+
+/** Split the AI explanation into a body and (optionally) the final "تذكر دايماً" tip. */
+function ExplanationContent({ text }: { text: string }) {
+  const tipRegex = /💡\s*تذكر\s*دا[يئ]ماً?\s*[:：]?\s*([\s\S]*)$/m
+  const match = text.match(tipRegex)
+  const body = match ? text.slice(0, match.index).trim() : text.trim()
+  const tip = match ? match[1].trim() : ''
+
+  const lines = body.split(/\n+/).filter(l => l.trim())
+
+  return (
+    <div className="space-y-3 text-slate-700 leading-relaxed text-sm">
+      {lines.map((line, i) => {
+        const trimmed = line.trim()
+        const isHeader = /^\*\*.+\*\*$/.test(trimmed)
+        if (isHeader) {
+          return (
+            <p key={i} className="text-violet-700 font-bold text-base mt-2">
+              {renderInline(trimmed, `h-${i}`)}
+            </p>
+          )
+        }
+        return <p key={i}>{renderInline(trimmed, `p-${i}`)}</p>
+      })}
+      {tip && (
+        <div className="mt-4 bg-gradient-to-r from-amber-100 to-yellow-100 border-2 border-amber-300 rounded-2xl p-3 flex gap-2 items-start shadow-sm">
+          <span className="text-2xl shrink-0">💡</span>
+          <div>
+            <p className="text-xs font-bold text-amber-800 mb-1">تذكر دايماً</p>
+            <p className="text-amber-900 font-semibold leading-relaxed">{renderInline(tip, 'tip')}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const SUBJECTS: { value: Subject; emoji: string; label: string; color: string }[] = [
   { value: 'arabic',         emoji: '📖', label: 'اللغة العربية',       color: 'from-purple-500 to-purple-600' },
@@ -310,7 +357,11 @@ export default function HelpPage() {
             {/* Question recap */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
               <p className="text-xs text-slate-400 mb-1">سؤالك هو</p>
-              <p className="text-sm text-slate-700 font-medium">{question}</p>
+              {question.trim() ? (
+                <p className="text-sm text-slate-700 font-medium">{question}</p>
+              ) : (
+                <p className="text-sm text-slate-500 italic">📸 اشرحلي اللي في الصور</p>
+              )}
               {imagePreviews.length > 0 && (
                 <div className="mt-2 flex gap-2 flex-wrap">
                   {imagePreviews.map((preview, i) => (
@@ -330,10 +381,12 @@ export default function HelpPage() {
               {loading ? (
                 <div className="flex flex-col items-center gap-3 py-6">
                   <div className="text-4xl animate-bounce">🧠</div>
-                  <p className="text-violet-600 font-medium text-sm">بيفكر وبيشرحلك...</p>
+                  <p className="text-violet-600 font-medium text-sm">
+                    {imageBase64Array.length > 0 ? 'بيقرا الصور وبيفكر...' : 'بيفكر وبيشرحلك...'}
+                  </p>
                 </div>
               ) : (
-                <p className="text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">{explanation}</p>
+                <ExplanationContent text={explanation} />
               )}
             </div>
 
