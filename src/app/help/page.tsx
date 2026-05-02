@@ -1,9 +1,89 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { type Subject } from '@/types'
 import BottomNav from '@/components/BottomNav'
+
+const HEADER_REGEX = /^\*\*([^*]+)\*\*$/
+const TIP_REGEX = /💡\s*تذكر\s*دا[يئ]ماً?\s*[:：]?\s*([\s\S]*)$/m
+
+/** Render a single line with inline **bold** markers. */
+function renderInline(line: string, keyPrefix: string) {
+  const parts = line.split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={`${keyPrefix}-${i}`} className="font-bold text-violet-800">{part.slice(2, -2)}</strong>
+    }
+    return <Fragment key={`${keyPrefix}-${i}`}>{part}</Fragment>
+  })
+}
+
+/** Split the AI explanation into a body and (optionally) the final "تذكر دايماً" tip. */
+function ExplanationContent({ text }: { text: string }) {
+  const match = text.match(TIP_REGEX)
+  const splitAt = match?.index ?? text.length
+  const body = match ? text.slice(0, splitAt).trim() : text.trim()
+  const tip = match ? match[1].trim() : ''
+
+  const lines = body.split(/\n+/).map(l => l.trim()).filter(Boolean)
+
+  return (
+    <div className="space-y-3 text-slate-700 leading-relaxed text-sm">
+      {lines.map((line, i) => {
+        const headerMatch = line.match(HEADER_REGEX)
+        if (headerMatch) {
+          return (
+            <p key={i} className="text-violet-700 font-bold text-base mt-2">
+              {headerMatch[1]}
+            </p>
+          )
+        }
+        return <p key={i}>{renderInline(line, `p-${i}`)}</p>
+      })}
+      {tip && (
+        <div className="mt-4 bg-gradient-to-r from-amber-100 to-yellow-100 border-2 border-amber-300 rounded-2xl p-3 flex gap-2 items-start shadow-sm">
+          <span className="text-2xl shrink-0">💡</span>
+          <div>
+            <p className="text-xs font-bold text-amber-800 mb-1">تذكر دايماً</p>
+            <p className="text-amber-900 font-semibold leading-relaxed">{renderInline(tip, 'tip')}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Downscale + JPEG-encode an image so multi-upload payloads stay under server body limits. */
+function compressImage(file: File, maxDim = 1600, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const ratio = Math.min(1, maxDim / Math.max(img.width, img.height))
+        const w = Math.max(1, Math.round(img.width * ratio))
+        const h = Math.max(1, Math.round(img.height * ratio))
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { reject(new Error('canvas-unavailable')); return }
+        ctx.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      } catch (e) {
+        reject(e)
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('image-decode-failed'))
+    }
+    img.src = url
+  })
+}
 
 const SUBJECTS: { value: Subject; emoji: string; label: string; color: string }[] = [
   { value: 'arabic',         emoji: '📖', label: 'اللغة العربية',       color: 'from-purple-500 to-purple-600' },
@@ -41,23 +121,25 @@ export default function HelpPage() {
     if (loaded && !userId) router.replace('/')
   }, [loaded, userId, router])
 
-  function handleImageFiles(files: File[]) {
+  async function handleImageFiles(files: File[]) {
     const remaining = MAX_IMAGES - imagePreviews.length
     const toAdd = files.slice(0, remaining)
 
-    const oversized = toAdd.filter(f => f.size > 5 * 1024 * 1024)
-    if (oversized.length > 0) { setError('الصورة أكبر من 5 ميجابايت، اختار صورة أصغر'); return }
+    const oversized = toAdd.filter(f => f.size > 15 * 1024 * 1024)
+    if (oversized.length > 0) { setError('الصورة أكبر من 15 ميجابايت، اختار صورة أصغر'); return }
 
-    toAdd.forEach(file => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string
-        setImagePreviews(prev => [...prev, base64])
-        setImageBase64Array(prev => [...prev, base64])
-      }
-      reader.readAsDataURL(file)
-    })
     setError('')
+    const results = await Promise.allSettled(toAdd.map(f => compressImage(f)))
+    const ok = results
+      .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+      .map(r => r.value)
+    const failed = results.length - ok.length
+
+    if (ok.length > 0) {
+      setImagePreviews(prev => [...prev, ...ok])
+      setImageBase64Array(prev => [...prev, ...ok])
+    }
+    if (failed > 0) setError('في صورة أو أكتر مقدرناش نقراها، جرب صورة تانية')
   }
 
   function removeImage(index: number) {
@@ -310,7 +392,11 @@ export default function HelpPage() {
             {/* Question recap */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
               <p className="text-xs text-slate-400 mb-1">سؤالك هو</p>
-              <p className="text-sm text-slate-700 font-medium">{question}</p>
+              {question.trim() ? (
+                <p className="text-sm text-slate-700 font-medium">{question}</p>
+              ) : (
+                <p className="text-sm text-slate-500 italic">📸 اشرحلي اللي في الصور</p>
+              )}
               {imagePreviews.length > 0 && (
                 <div className="mt-2 flex gap-2 flex-wrap">
                   {imagePreviews.map((preview, i) => (
@@ -330,10 +416,12 @@ export default function HelpPage() {
               {loading ? (
                 <div className="flex flex-col items-center gap-3 py-6">
                   <div className="text-4xl animate-bounce">🧠</div>
-                  <p className="text-violet-600 font-medium text-sm">بيفكر وبيشرحلك...</p>
+                  <p className="text-violet-600 font-medium text-sm">
+                    {imageBase64Array.length > 0 ? 'بيقرا الصور وبيفكر...' : 'بيفكر وبيشرحلك...'}
+                  </p>
                 </div>
               ) : (
-                <p className="text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">{explanation}</p>
+                <ExplanationContent text={explanation} />
               )}
             </div>
 
