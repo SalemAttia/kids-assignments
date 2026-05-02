@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
         { role: 'system', content: buildSystemPrompt(subject as Subject, grade, hasImages) },
         { role: 'user',   content: userContent },
       ],
-      max_tokens: 900,
+      max_completion_tokens: 900,
       temperature: 0.7,
     })
 
