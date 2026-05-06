@@ -1,17 +1,22 @@
-import { Subject, SUBJECT_LABELS, QuizDifficulty } from '@/types'
+import { Subject, SUBJECT_LABELS, QuizDifficulty, CheckinSubject, CheckinMood, CheckinEnergy, CheckinSleep } from '@/types'
 
 const DIFFICULTY_INSTRUCTIONS: Record<QuizDifficulty, string> = {
-  easy: `- مستوى الأسئلة: سهل جداً
-- الأسئلة لازم تكون مباشرة ومن صميم الدرس، والإجابة الصحيحة تكون واضحة للطالب اللي ذاكر
-- ابعد عن أي تفاصيل دقيقة أو أسئلة تحتاج تفكير عميق`,
+  easy: `- مستوى الأسئلة: متوسط مائل للسهل (مش سهل جداً)
+- ممنوع الأسئلة المباشرة اللي إجابتها واضحة من أول نظرة - لازم الطالب يفكر شوية
+- خلي معظم الأسئلة تحتاج فهم للدرس مش مجرد حفظ
+- ممكن تربط بين معلومتين من الدرس أو تسأل عن تفاصيل مهمة موجودة في المحتوى
+- ممنوع أسئلة تعجيزية، لكن لازم يكون فيها تحدي حقيقي يخلي الطالب يستفيد`,
 
-  medium: `- مستوى الأسئلة: متوسط
-- ممكن تسأل أسئلة تحتاج الطالب يفكر شوية أو يربط بين معلومتين من الدرس
-- الأسئلة تكون واضحة لكن مش كلها سهلة جداً - خلي فيها تحدي مناسب`,
+  medium: `- مستوى الأسئلة: متوسط لصعب
+- اسأل أسئلة تحتاج الطالب يفهم الدرس كويس ويربط بين أكتر من معلومة
+- ركّز على التفاصيل المهمة والمفاهيم الأساسية، مش المعلومات السطحية
+- ممكن تسأل أسئلة تطبيق على أمثلة جديدة مبنية على الدرس
+- خلي الأسئلة فيها تحدي واضح يميّز الطالب اللي فاهم عن اللي حافظ بس`,
 
   hard: `- مستوى الأسئلة: صعب
-- اسأل أسئلة تحتاج فهم عميق وتطبيق، مش مجرد حفظ
-- ممكن تسأل أسئلة تحليل أو استنتاج أو تطبيق على حالات جديدة مبنية على الدرس
+- اسأل أسئلة تحتاج فهم عميق وتطبيق وتحليل، مش مجرد حفظ
+- ممكن تسأل أسئلة استنتاج أو مقارنة أو تطبيق على حالات جديدة مبنية على الدرس
+- ركّز على الفروق الدقيقة والمفاهيم اللي بتلخبط الطلاب عادةً
 - خلي الأسئلة فيها تحدي حقيقي لكن لسه في نطاق اللي ذاكره الطالب - ممنوع أسئلة تعجيزية أو خارج الدرس`,
 }
 
@@ -108,10 +113,14 @@ ${subjectInstructions}
 المستوى المطلوب للأسئلة:
 ${difficultyInstructions}
 
-أنشئ 8 أسئلة اختيار من متعدد عن مادة "${subjectLabel}":
+أنشئ لحد 15 سؤال اختيار من متعدد عن مادة "${subjectLabel}":
+- الحد الأقصى 15 سؤال، لكن ممكن تعمل أقل لو المحتوى مش فيه نقاط كفاية تستاهل أسئلة بجودة عالية
+- الجودة أهم من العدد - سؤال كويس أحسن من سؤالين متكررين أو ضعيفين
 - كل الأسئلة اختيار من متعدد (3 اختيارات واضحة ومختلفة)
 - السؤال قصير ومفهوم والاختيارات واضحة
 - ممنوع أسئلة خداعية (لكن مسموح الأسئلة اللي تحتاج تفكير حسب المستوى المطلوب فوق)
+- نوّع في أنواع الأسئلة: فهم، تطبيق، تحليل، ربط بين معلومات، تفاصيل دقيقة من الدرس
+- ممنوع تكرار نفس الفكرة في أكتر من سؤال - كل سؤال لازم يغطي نقطة مختلفة من الدرس
 ${imageUserRules}
 
 أعد JSON بالشكل التالي:
@@ -273,6 +282,80 @@ ${JSON.stringify(questionsAndAnswers, null, 2)}
     }
   ],
   "suggestions": ["<اقتراح تحسين 1>", "<اقتراح تحسين 2>"]
+}`
+  }
+}
+
+export function buildCheckinAnalysisPrompt(params: {
+  studentName: string
+  grade: number
+  today: {
+    checkin_date: string
+    mood: CheckinMood | null
+    energy: CheckinEnergy | null
+    sleep: CheckinSleep | null
+    subjects_studied: CheckinSubject[]
+    hardest_thing: string | null
+    best_thing: string | null
+    bothered: boolean
+    bothered_note: string | null
+  }
+  recent: Array<{
+    checkin_date: string
+    mood: CheckinMood | null
+    energy: CheckinEnergy | null
+    subjects_studied: CheckinSubject[]
+    hardest_thing: string | null
+    bothered: boolean
+  }>
+}) {
+  const subjectsLine = params.today.subjects_studied.length > 0
+    ? params.today.subjects_studied.map(s =>
+        `${SUBJECT_LABELS[s.subject]}: صعوبة=${s.difficulty}, ثقة=${s.confidence}/5, متعة=${s.enjoyment}`
+      ).join(' | ')
+    : 'لم يذاكر مواد اليوم'
+
+  const recentLine = params.recent.length > 0
+    ? params.recent.map(r =>
+        `${r.checkin_date}: mood=${r.mood ?? '?'}, energy=${r.energy ?? '?'}, bothered=${r.bothered ? 'yes' : 'no'}` +
+        (r.hardest_thing ? `, hardest="${r.hardest_thing.slice(0, 80)}"` : '') +
+        (r.subjects_studied.length > 0
+          ? `, subjects=[${r.subjects_studied.map(s => `${s.subject}(c${s.confidence},${s.difficulty})`).join(',')}]`
+          : '')
+      ).join('\n')
+    : 'لا يوجد تشيك-إن سابق'
+
+  return {
+    system: `أنت مستشار تعليمي ونفسي بتساعد أهالي الطلاب المصريين يفهموا ابنهم بيحس إزاي ومحتاج إيه.
+مهمتك: تحلل التشيك-إن اليومي للطالب مع آخر أيام سابقة، وترجع إشارات واضحة للأهل.
+القواعد:
+- اكتب بالعامية المصرية البسيطة، باختصار شديد
+- كل "red_flag" لازم يكون قصير جداً ومحدد (زي: "ثقة منخفضة في الرياضيات 3 أيام متتالية")، مش شرح طويل
+- كل "theme" كلمة أو كلمتين يلخصوا موضوع متكرر (زي: "الكسور"، "قلق من الامتحان")
+- الـ summary جملة أو جملتين بس تلخص إحساس اليوم
+- ما تبالغش في التحذيرات - بس اللي فعلاً ملحوظ
+- لو مفيش إشارات خطر، رجع red_flags فاضية
+- أجب بـ JSON فقط`,
+    user: `الطالب: ${params.studentName} (الصف ${params.grade})
+تاريخ اليوم: ${params.today.checkin_date}
+
+تشيك-إن اليوم:
+- المزاج: ${params.today.mood ?? '?'}
+- الطاقة: ${params.today.energy ?? '?'}
+- النوم: ${params.today.sleep ?? '?'}
+- المواد اللي ذاكرها: ${subjectsLine}
+- أصعب حاجة: ${params.today.hardest_thing || '(لم يذكر)'}
+- أحسن حاجة: ${params.today.best_thing || '(لم يذكر)'}
+- في حاجة مضايقاه: ${params.today.bothered ? `آه - "${params.today.bothered_note || 'بدون تفاصيل'}"` : 'لا'}
+
+آخر 6 أيام سابقة (للاتجاه):
+${recentLine}
+
+حلل ورجع JSON:
+{
+  "summary": "<جملة أو جملتين>",
+  "red_flags": ["<إشارة خطر قصيرة 1>", "<إشارة خطر قصيرة 2>"],
+  "themes": ["<موضوع متكرر 1>", "<موضوع متكرر 2>"]
 }`
   }
 }
