@@ -51,10 +51,12 @@ export async function POST(req: NextRequest) {
       student_answer: qaMap.get(q.id) || '',
     }))
 
+    const isPreschool = !!session.users?.is_preschool
     const prompt = buildEvaluateAnswersPrompt(
       session.subject as Subject,
       session.users.grade,
-      questionsAndAnswers
+      questionsAndAnswers,
+      isPreschool
     )
 
     const model = await getModelForRole('reasoning')

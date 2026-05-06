@@ -32,6 +32,17 @@ export default function QuizPage() {
   useEffect(() => {
     if (!loaded) return
     if (!userId) { router.replace('/'); return }
+
+    // Preschool redirect guard
+    createClient()
+      .from('users')
+      .select('is_preschool')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => {
+        if (data?.is_preschool) router.replace('/preschool/hub')
+      })
+
     const sessionId = getSessionId()
     if (!sessionId) { router.replace('/study'); return }
 

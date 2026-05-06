@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useStudySession } from '@/hooks/useStudySession'
+import { createClient } from '@/lib/supabase/client'
 import type { Report } from '@/types'
 import BottomNav from '@/components/BottomNav'
 
@@ -52,6 +53,17 @@ export default function ReportPage() {
   useEffect(() => {
     if (!loaded) return
     if (!userId) { router.replace('/'); return }
+
+    // Preschool redirect guard
+    createClient()
+      .from('users')
+      .select('is_preschool')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => {
+        if (data?.is_preschool) router.replace('/preschool/hub')
+      })
+
     const raw = sessionStorage.getItem('reportData')
     if (!raw) { router.replace('/study'); return }
     setData(JSON.parse(raw))

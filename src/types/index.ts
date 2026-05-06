@@ -14,6 +14,7 @@ export interface User {
   streak: number
   last_active: string | null
   quiz_difficulty: QuizDifficulty
+  is_preschool: boolean
   created_at: string
 }
 

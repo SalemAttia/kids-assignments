@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { openai, getModelForRole } from '@/lib/openai/client'
 import { isOSeriesModel } from '@/lib/openai/models'
-import { buildGenerateQuestionsPrompt } from '@/lib/openai/prompts'
+import { buildGenerateQuestionsPrompt, buildPreschoolQuestionsPrompt, type PreschoolSubject } from '@/lib/openai/prompts'
 import { GeneratedQuestionsSchema, parseJSON } from '@/lib/openai/parser'
 import { z } from 'zod'
 import type { Subject, QuizDifficulty } from '@/types'
@@ -23,33 +23,51 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { sessionId, subject, description, grade, difficulty, imageUrls, imageUrl } = RequestSchema.parse(body)
 
-    // Merge image sources
-    const allImageUrls: string[] = imageUrls && imageUrls.length > 0
-      ? imageUrls
-      : imageUrl ? [imageUrl] : []
+    const supabase = await createServerClient()
 
-    // Enforce minimum 2 images for new sessions (imageUrls array flow)
-    if (imageUrls !== undefined && imageUrls.length > 0 && imageUrls.length < 2) {
+    // Detect preschool mode from the session's user (server-side source of truth).
+    const { data: sessionRow, error: sessionErr } = await supabase
+      .from('study_sessions')
+      .select('users(is_preschool)')
+      .eq('id', sessionId)
+      .single()
+    if (sessionErr || !sessionRow) {
+      return NextResponse.json({ error: 'الجلسة مش موجودة' }, { status: 400 })
+    }
+    // The Supabase join returns either an object or an array depending on relation; normalize.
+    const userField = (sessionRow as { users: { is_preschool: boolean } | { is_preschool: boolean }[] }).users
+    const isPreschool = Array.isArray(userField)
+      ? !!userField[0]?.is_preschool
+      : !!userField?.is_preschool
+
+    // Merge image sources (school mode only)
+    const allImageUrls: string[] = !isPreschool && imageUrls && imageUrls.length > 0
+      ? imageUrls
+      : !isPreschool && imageUrl ? [imageUrl] : []
+
+    // Enforce minimum 2 images for new sessions (school-mode imageUrls array flow)
+    if (!isPreschool && imageUrls !== undefined && imageUrls.length > 0 && imageUrls.length < 2) {
       return NextResponse.json(
         { error: 'لازم ترفع صورتين على الأقل من الكتاب عشان نعملك أسئلة كويسة' },
         { status: 400 }
       )
     }
 
-    const supabase = await createServerClient()
-    const prompt = buildGenerateQuestionsPrompt(
-      subject as Subject,
-      description,
-      grade,
-      (difficulty ?? 'easy') as QuizDifficulty,
-      allImageUrls.length > 0,
-    )
+    const prompt = isPreschool
+      ? buildPreschoolQuestionsPrompt(subject as PreschoolSubject)
+      : buildGenerateQuestionsPrompt(
+          subject as Subject,
+          description,
+          grade,
+          (difficulty ?? 'easy') as QuizDifficulty,
+          allImageUrls.length > 0,
+        )
 
     const messages: Parameters<typeof openai.chat.completions.create>[0]['messages'] = [
       { role: 'system', content: prompt.system },
     ]
 
-    if (allImageUrls.length > 0) {
+    if (!isPreschool && allImageUrls.length > 0) {
       const contentParts: Parameters<typeof openai.chat.completions.create>[0]['messages'][number]['content'] = [
         { type: 'text', text: prompt.user },
         ...allImageUrls.map(url => ({

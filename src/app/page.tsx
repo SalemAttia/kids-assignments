@@ -11,13 +11,14 @@ const AVATARS: Record<number, string> = { 6: '🧒', 7: '👦', 8: '👦', 9: '�
 
 function gradeLabel(grade: number) {
   const names: Record<number, string> = {
+    0: 'تمهيدي (KG)',
     1: 'الأول ابتدائي',   2: 'الثاني ابتدائي',  3: 'الثالث ابتدائي',
     4: 'الرابع ابتدائي',  5: 'الخامس ابتدائي',  6: 'السادسة ابتدائي',
     7: 'الأول إعدادي',    8: 'الثاني إعدادي',   9: 'الثالث إعدادي',
   }
   return names[grade] ?? `الصف ${grade}`
 }
-const BG_COLORS = ['from-blue-400 to-purple-500', 'from-pink-400 to-orange-400']
+const BG_COLORS = ['from-blue-400 to-purple-500', 'from-pink-400 to-orange-400', 'from-green-400 to-teal-500']
 
 export default function HomePage() {
   const [users, setUsers] = useState<User[]>([])
@@ -39,7 +40,7 @@ export default function HomePage() {
   function handleSelect(user: User) {
     setPicking(user.id)
     setUserId(user.id)
-    router.push('/hub')
+    router.push(user.is_preschool ? '/preschool/hub' : '/hub')
   }
 
   if (loading) return (
@@ -75,12 +76,14 @@ export default function HomePage() {
             disabled={picking !== null}
             className={`flex-1 bg-gradient-to-br ${BG_COLORS[idx % BG_COLORS.length]} rounded-3xl p-7 text-center shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 ${picking === user.id ? 'scale-95 opacity-80' : ''}`}
           >
-            <div className="text-6xl mb-3 drop-shadow">{AVATARS[user.grade] || '👤'}</div>
+            <div className="text-6xl mb-3 drop-shadow">
+              {user.is_preschool ? '🧸' : (AVATARS[user.grade] || '👤')}
+            </div>
             <div className="text-2xl font-black text-white drop-shadow">{user.name}</div>
             <div className="text-white/80 text-sm mt-1">
-              {gradeLabel(user.grade)}
+              {user.is_preschool ? '🧸 تمهيدي' : gradeLabel(user.grade)}
             </div>
-            {user.streak > 0 && (
+            {!user.is_preschool && user.streak > 0 && (
               <div className="mt-3 bg-white/20 rounded-full px-3 py-1 text-sm text-white font-bold inline-block">
                 🔥 {user.streak} يوم
               </div>

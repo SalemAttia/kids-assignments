@@ -137,6 +137,9 @@ INSERT INTO ai_settings (id, reasoning_model, fast_model)
 VALUES ('global', 'gpt-4.1', 'gpt-4.1-mini')
 ON CONFLICT (id) DO NOTHING;
 
+-- Preschool (KG) mode for very young kids (~4yr olds)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_preschool BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Daily student check-ins: subjective signal about how the kid feels,
 -- what they studied, what was hard, and whether anything is bothering them.
 CREATE TABLE IF NOT EXISTS checkins (

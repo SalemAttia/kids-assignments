@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useStudySession } from '@/hooks/useStudySession'
 import { uploadStudyImages } from '@/lib/supabase/storage'
+import { createClient } from '@/lib/supabase/client'
 import { type Subject } from '@/types'
 import { useEffect } from 'react'
 import BottomNav from '@/components/BottomNav'
@@ -49,7 +50,17 @@ export default function StudyPage() {
   const startTimeRef = useRef<number>(Date.now())
 
   useEffect(() => {
-    if (loaded && !userId) router.replace('/')
+    if (loaded && !userId) { router.replace('/'); return }
+    if (!userId) return
+    // Preschool redirect guard
+    createClient()
+      .from('users')
+      .select('is_preschool')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => {
+        if (data?.is_preschool) router.replace('/preschool/hub')
+      })
   }, [loaded, userId, router])
 
   useEffect(() => {
