@@ -27,7 +27,7 @@ CREATE TABLE questions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   session_id UUID NOT NULL REFERENCES study_sessions(id) ON DELETE CASCADE,
   question_text TEXT NOT NULL,
-  question_type TEXT NOT NULL CHECK (question_type IN ('multiple_choice','short_answer')),
+  question_type TEXT NOT NULL CHECK (question_type IN ('multiple_choice','multi_select','true_false','short_answer','fill_blank','ordering')),
   options JSONB,
   correct_answer TEXT NOT NULL,
   order_index INT NOT NULL DEFAULT 0,

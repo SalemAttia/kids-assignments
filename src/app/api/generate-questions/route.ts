@@ -45,10 +45,10 @@ export async function POST(req: NextRequest) {
       ? imageUrls
       : !isPreschool && imageUrl ? [imageUrl] : []
 
-    // Enforce minimum 2 images for new sessions (school-mode imageUrls array flow)
-    if (!isPreschool && imageUrls !== undefined && imageUrls.length > 0 && imageUrls.length < 2) {
+    // Enforce minimum 4 images for new sessions (school-mode imageUrls array flow)
+    if (!isPreschool && imageUrls !== undefined && imageUrls.length > 0 && imageUrls.length < 4) {
       return NextResponse.json(
-        { error: 'لازم ترفع صورتين على الأقل من الكتاب عشان نعملك أسئلة كويسة' },
+        { error: 'لازم ترفع 4 صور على الأقل من الكتاب عشان نعملك أسئلة كويسة' },
         { status: 400 }
       )
     }
@@ -90,10 +90,33 @@ export async function POST(req: NextRequest) {
     const raw = completion.choices[0].message.content || '{}'
     const { questions: parsed } = parseJSON(GeneratedQuestionsSchema, raw)
 
-    // Only keep multiple-choice questions with valid options
-    const questions = parsed.filter(q =>
-      q.question_type === 'multiple_choice' && Array.isArray(q.options) && q.options.length >= 2
-    )
+    // Preschool mode stays multiple-choice only. School mode allows the full type set,
+    // but each type must have a valid options shape.
+    const TYPES_REQUIRING_OPTIONS = new Set([
+      'multiple_choice',
+      'multi_select',
+      'true_false',
+      'ordering',
+    ])
+    const TYPES_WITHOUT_OPTIONS = new Set(['short_answer', 'fill_blank'])
+
+    const questions = parsed.filter(q => {
+      if (isPreschool) {
+        return q.question_type === 'multiple_choice'
+          && Array.isArray(q.options)
+          && q.options.length >= 2
+      }
+      if (TYPES_REQUIRING_OPTIONS.has(q.question_type)) {
+        if (!Array.isArray(q.options) || q.options.length < 2) return false
+        if (q.question_type === 'true_false' && q.options.length !== 2) return false
+        if (q.question_type === 'ordering' && q.options.length < 3) return false
+        return true
+      }
+      if (TYPES_WITHOUT_OPTIONS.has(q.question_type)) {
+        return typeof q.correct_answer === 'string' && q.correct_answer.trim().length > 0
+      }
+      return false
+    })
 
     if (questions.length === 0) {
       return NextResponse.json({ error: 'فشل توليد الأسئلة - حاول تاني' }, { status: 500 })

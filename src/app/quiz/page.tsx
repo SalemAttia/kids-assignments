@@ -7,6 +7,183 @@ import { createClient } from '@/lib/supabase/client'
 import type { Question } from '@/types'
 import BottomNav from '@/components/BottomNav'
 
+function parseJsonArray(raw: string | undefined): string[] {
+  if (!raw) return []
+  try {
+    const v = JSON.parse(raw)
+    return Array.isArray(v) ? v.map(String) : []
+  } catch {
+    return []
+  }
+}
+
+function isQuestionAnswered(q: Question, raw: string | undefined): boolean {
+  if (!raw) return false
+  if (q.question_type === 'multi_select') return parseJsonArray(raw).length > 0
+  if (q.question_type === 'ordering') return parseJsonArray(raw).length > 0
+  return raw.trim().length > 0
+}
+
+interface QuestionBodyProps {
+  question: Question
+  answer: string | undefined
+  onSingleSelect: (value: string) => void
+  onToggleMulti: (option: string) => void
+  onTextChange: (value: string) => void
+  onMoveItem: (fromIndex: number, direction: -1 | 1) => void
+}
+
+function QuestionBody({
+  question,
+  answer,
+  onSingleSelect,
+  onToggleMulti,
+  onTextChange,
+  onMoveItem,
+}: QuestionBodyProps) {
+  const typeBadge: Record<Question['question_type'], { label: string; color: string }> = {
+    multiple_choice: { label: 'اختيار من متعدد', color: 'bg-blue-100 text-blue-700' },
+    multi_select:   { label: 'اختر كل اللي ينطبق', color: 'bg-purple-100 text-purple-700' },
+    true_false:     { label: 'صح أو خطأ', color: 'bg-teal-100 text-teal-700' },
+    short_answer:   { label: 'إجابة قصيرة', color: 'bg-amber-100 text-amber-700' },
+    fill_blank:     { label: 'املأ الفراغ', color: 'bg-pink-100 text-pink-700' },
+    ordering:       { label: 'رتّب بالترتيب الصحيح', color: 'bg-indigo-100 text-indigo-700' },
+  }
+  const badge = typeBadge[question.question_type]
+
+  const selectedMulti = parseJsonArray(answer)
+  const orderingList = parseJsonArray(answer).length > 0
+    ? parseJsonArray(answer)
+    : (question.options ?? [])
+
+  return (
+    <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-100 mb-5">
+      <div className="flex items-center justify-between mb-3">
+        <span className={`text-xs font-bold px-3 py-1 rounded-full ${badge.color}`}>{badge.label}</span>
+        {question.question_type === 'multi_select' && (
+          <span className="text-[11px] text-slate-400">يمكن اختيار أكتر من إجابة</span>
+        )}
+      </div>
+
+      <p className="text-lg font-bold text-slate-800 mb-6 leading-relaxed whitespace-pre-wrap">
+        {question.question_text}
+      </p>
+
+      {(question.question_type === 'multiple_choice' || question.question_type === 'true_false') && question.options && (
+        <div className="space-y-3">
+          {question.options.map((option) => {
+            const selected = answer === option
+            return (
+              <button
+                key={option}
+                onClick={() => onSingleSelect(option)}
+                className={`w-full text-right p-4 rounded-2xl border-2 font-semibold transition-all active:scale-98 ${
+                  selected
+                    ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-md'
+                    : 'border-slate-100 bg-slate-50 text-slate-700 hover:border-blue-200 hover:bg-blue-50/50'
+                }`}
+              >
+                {option}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {question.question_type === 'multi_select' && question.options && (
+        <div className="space-y-3">
+          {question.options.map((option) => {
+            const selected = selectedMulti.includes(option)
+            return (
+              <button
+                key={option}
+                onClick={() => onToggleMulti(option)}
+                className={`w-full text-right p-4 rounded-2xl border-2 font-semibold transition-all active:scale-98 flex items-center gap-3 ${
+                  selected
+                    ? 'border-purple-500 bg-purple-50 text-purple-800 shadow-md'
+                    : 'border-slate-100 bg-slate-50 text-slate-700 hover:border-purple-200 hover:bg-purple-50/50'
+                }`}
+              >
+                <span
+                  className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center ${
+                    selected ? 'border-purple-500 bg-purple-500 text-white' : 'border-slate-300 bg-white'
+                  }`}
+                  aria-hidden
+                >
+                  {selected ? '✓' : ''}
+                </span>
+                <span className="flex-1 text-right">{option}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {(question.question_type === 'short_answer' || question.question_type === 'fill_blank') && (
+        <textarea
+          value={answer || ''}
+          onChange={(e) => onTextChange(e.target.value)}
+          placeholder={
+            question.question_type === 'fill_blank'
+              ? 'اكتب الكلمة الناقصة... ✍️'
+              : 'اكتب إجابتك هنا... 📝'
+          }
+          className="w-full h-28 p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 resize-none focus:outline-none focus:border-blue-400 focus:bg-white text-slate-700 transition-all"
+          dir="rtl"
+        />
+      )}
+
+      {question.question_type === 'ordering' && question.options && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-slate-500">استخدم الأسهم لتغيير الترتيب — من الأول للآخر:</p>
+            {parseJsonArray(answer).length === 0 && (
+              <button
+                type="button"
+                onClick={() => onTextChange(JSON.stringify(orderingList))}
+                className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg active:scale-95"
+              >
+                ✓ ثبّت الترتيب
+              </button>
+            )}
+          </div>
+          {orderingList.map((item, idx) => (
+            <div
+              key={`${item}-${idx}`}
+              className="flex items-center gap-2 p-3 rounded-2xl border-2 border-slate-100 bg-slate-50"
+            >
+              <span className="shrink-0 w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 font-black flex items-center justify-center text-sm">
+                {idx + 1}
+              </span>
+              <span className="flex-1 text-right font-semibold text-slate-700">{item}</span>
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => onMoveItem(idx, -1)}
+                  disabled={idx === 0}
+                  className="w-8 h-7 rounded-lg bg-white border border-slate-200 text-slate-600 disabled:opacity-30 active:scale-90 transition"
+                  aria-label="حرّك لفوق"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMoveItem(idx, 1)}
+                  disabled={idx === orderingList.length - 1}
+                  className="w-8 h-7 rounded-lg bg-white border border-slate-200 text-slate-600 disabled:opacity-30 active:scale-90 transition"
+                  aria-label="حرّك لتحت"
+                >
+                  ▼
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const ENCOURAGEMENTS = [
   'برافو! كمل! 💪',
   'ممتاز! استمر! 🌟',
@@ -104,6 +281,23 @@ export default function QuizPage() {
     setTimeout(() => setJustAnswered(false), 600)
   }
 
+  function toggleMultiSelect(question: Question, option: string) {
+    const current = parseJsonArray(answers[question.id])
+    const next = current.includes(option)
+      ? current.filter(o => o !== option)
+      : [...current, option]
+    handleAnswer(question.id, JSON.stringify(next))
+  }
+
+  function moveOrderingItem(question: Question, fromIndex: number, direction: -1 | 1) {
+    const baseOrder = parseJsonArray(answers[question.id])
+    const order = baseOrder.length > 0 ? [...baseOrder] : [...(question.options ?? [])]
+    const toIndex = fromIndex + direction
+    if (toIndex < 0 || toIndex >= order.length) return
+    ;[order[fromIndex], order[toIndex]] = [order[toIndex], order[fromIndex]]
+    handleAnswer(question.id, JSON.stringify(order))
+  }
+
   function handleNext() {
     setCurrentIndex(i => i + 1)
   }
@@ -174,7 +368,7 @@ export default function QuizPage() {
   const current = questions[currentIndex]
   const progress = Math.round(((currentIndex + 1) / questions.length) * 100)
   const encouragement = ENCOURAGEMENTS[currentIndex % ENCOURAGEMENTS.length]
-  const isAnswered = !!answers[current.id]
+  const isAnswered = isQuestionAnswered(current, answers[current.id])
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4" dir="rtl">
@@ -215,35 +409,14 @@ export default function QuizPage() {
         )}
 
         {/* Question Card */}
-        <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-100 mb-5">
-          <p className="text-lg font-bold text-slate-800 mb-6 leading-relaxed">{current.question_text}</p>
-
-          {current.question_type === 'multiple_choice' && current.options ? (
-            <div className="space-y-3">
-              {current.options.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => handleAnswer(current.id, option)}
-                  className={`w-full text-right p-4 rounded-2xl border-2 font-semibold transition-all active:scale-98 ${
-                    answers[current.id] === option
-                      ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-md'
-                      : 'border-slate-100 bg-slate-50 text-slate-700 hover:border-blue-200 hover:bg-blue-50/50'
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <textarea
-              value={answers[current.id] || ''}
-              onChange={(e) => handleAnswer(current.id, e.target.value)}
-              placeholder="اكتب إجابتك هنا... 📝"
-              className="w-full h-32 p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 resize-none focus:outline-none focus:border-blue-400 focus:bg-white text-slate-700 transition-all"
-              dir="rtl"
-            />
-          )}
-        </div>
+        <QuestionBody
+          question={current}
+          answer={answers[current.id]}
+          onSingleSelect={(value) => handleAnswer(current.id, value)}
+          onToggleMulti={(option) => toggleMultiSelect(current, option)}
+          onTextChange={(value) => handleAnswer(current.id, value)}
+          onMoveItem={(idx, dir) => moveOrderingItem(current, idx, dir)}
+        />
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700 mb-4 text-center">
