@@ -2,7 +2,14 @@ import { z } from 'zod'
 
 const QuestionSchema = z.object({
   question_text: z.string(),
-  question_type: z.enum(['multiple_choice', 'short_answer']),
+  question_type: z.enum([
+    'multiple_choice',
+    'multi_select',
+    'true_false',
+    'short_answer',
+    'fill_blank',
+    'ordering',
+  ]),
   options: z.array(z.string()).nullable(),
   correct_answer: z.string(),
 })

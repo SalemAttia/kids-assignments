@@ -41,11 +41,19 @@ export interface StudySession {
   created_at: string
 }
 
+export type QuestionType =
+  | 'multiple_choice'
+  | 'multi_select'
+  | 'true_false'
+  | 'short_answer'
+  | 'fill_blank'
+  | 'ordering'
+
 export interface Question {
   id: string
   session_id: string
   question_text: string
-  question_type: 'multiple_choice' | 'short_answer'
+  question_type: QuestionType
   options: string[] | null
   correct_answer: string
   order_index: number
