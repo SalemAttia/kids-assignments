@@ -26,8 +26,8 @@ const HINTS = [
   'في حاجة مش فاهمها تماماً؟',
 ]
 
-const MIN_IMAGES = 2
-const MAX_IMAGES = 5
+const MIN_IMAGES = 4
+const MAX_IMAGES = 8
 
 export default function StudyPage() {
   const router = useRouter()
@@ -311,7 +311,7 @@ export default function StudyPage() {
               <div className="text-5xl mb-3">📷</div>
               <h1 className="text-2xl font-bold text-slate-800">ضيف صور من الكتاب</h1>
               <p className="text-slate-500 text-sm mt-1">
-                صور من الكتاب أو الدفتر عشان نسألك أسئلة على اللي ذاكرته! (صورتين على الأقل، حتى {MAX_IMAGES} صور)
+                صور من الكتاب أو الدفتر عشان نسألك أسئلة على اللي ذاكرته! ({MIN_IMAGES} صور على الأقل، حتى {MAX_IMAGES} صور)
               </p>
             </div>
 

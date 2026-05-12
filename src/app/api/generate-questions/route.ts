@@ -45,10 +45,10 @@ export async function POST(req: NextRequest) {
       ? imageUrls
       : !isPreschool && imageUrl ? [imageUrl] : []
 
-    // Enforce minimum 2 images for new sessions (school-mode imageUrls array flow)
-    if (!isPreschool && imageUrls !== undefined && imageUrls.length > 0 && imageUrls.length < 2) {
+    // Enforce minimum 4 images for new sessions (school-mode imageUrls array flow)
+    if (!isPreschool && imageUrls !== undefined && imageUrls.length > 0 && imageUrls.length < 4) {
       return NextResponse.json(
-        { error: 'لازم ترفع صورتين على الأقل من الكتاب عشان نعملك أسئلة كويسة' },
+        { error: 'لازم ترفع 4 صور على الأقل من الكتاب عشان نعملك أسئلة كويسة' },
         { status: 400 }
       )
     }
