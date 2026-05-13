@@ -96,7 +96,6 @@ export async function POST(req: NextRequest) {
       'multiple_choice',
       'multi_select',
       'true_false',
-      'ordering',
     ])
     const TYPES_WITHOUT_OPTIONS = new Set(['short_answer', 'fill_blank'])
 
@@ -109,7 +108,6 @@ export async function POST(req: NextRequest) {
       if (TYPES_REQUIRING_OPTIONS.has(q.question_type)) {
         if (!Array.isArray(q.options) || q.options.length < 2) return false
         if (q.question_type === 'true_false' && q.options.length !== 2) return false
-        if (q.question_type === 'ordering' && q.options.length < 3) return false
         return true
       }
       if (TYPES_WITHOUT_OPTIONS.has(q.question_type)) {
